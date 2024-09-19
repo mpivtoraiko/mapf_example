@@ -16,12 +16,11 @@
 #define PLANNER_STARTER_CODE_H
 
 // class Point {
-//  public: 
+//  public:
 //    Point();
 //    Point(int x_input, int y_input);
 
-struct Point
-{
+struct Point {
    int x, y;
 
    inline bool operator==(const Point &other) const {
@@ -53,8 +52,7 @@ template <> struct hash<Point> {
 };
 } // namespace std
 
-
-std::ostream& operator<<(std::ostream& os, const Point& point);
+std::ostream &operator<<(std::ostream &os, const Point &point);
 
 // --------------- Grid ---------------
 
@@ -134,7 +132,9 @@ class Robot {
       }
    };
 
-   friend bool operator<(const Robot &lhs, const Robot &rhs) { return lhs.id < rhs.id; }
+   friend bool operator<(const Robot &lhs, const Robot &rhs) {
+      return lhs.id < rhs.id;
+   }
 
  private:
    int id;

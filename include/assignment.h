@@ -1,4 +1,4 @@
-//#pragma once
+#pragma once
 
 // #ifndef ASSIGNMENT_H
 // #define ASSIGNMENT_H
@@ -7,7 +7,6 @@
 #include <boost/bimap/unordered_set_of.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <cstdint>
-#include <string>
 
 #include "planner_starter_code.hpp"
 
@@ -16,7 +15,8 @@ class Assignment {
    Assignment();
 
    void set_cost(const Robot &robot, const Point &goal, uint32_t cost);
-   uint32_t run_solver(std::map<Robot, Point> &solution);
+   uint32_t run_solver(std::map<Robot, Point> &solution,
+                       std::list<Point> &unallocated_robots);
 
  protected:
    typedef boost::adjacency_list_traits<boost::vecS, boost::vecS,
@@ -34,7 +34,7 @@ class Assignment {
 
       int32_t m_cost;
       int32_t m_capacity;
-      int32_t m_residual_capacity; 
+      int32_t m_residual_capacity;
       edge_t m_reverse;
       bool m_is_reverse;
    };
@@ -47,8 +47,14 @@ class Assignment {
    void upsert_edge(vertex_t src_vx, vertex_t sink_vx, int32_t cost);
 
  private:
-   typedef boost::bimap<boost::bimaps::unordered_set_of<Robot, Robot::Hash, Robot::Equality>, vertex_t> robot_map_t;
-   typedef boost::bimap<boost::bimaps::unordered_set_of<Point, Point::Hash, Point::Equality>, vertex_t> goal_map_t;
+   typedef boost::bimap<
+       boost::bimaps::unordered_set_of<Robot, Robot::Hash, Robot::Equality>,
+       vertex_t>
+       robot_map_t;
+   typedef boost::bimap<
+       boost::bimaps::unordered_set_of<Point, Point::Hash, Point::Equality>,
+       vertex_t>
+       goal_map_t;
 
    robot_map_t m_robots;
    goal_map_t m_goals;
@@ -60,5 +66,4 @@ class Assignment {
    vertex_t m_sink_vx;
 };
 
-
-//#endif // ASSIGNMENT_H
+// #endif // ASSIGNMENT_H

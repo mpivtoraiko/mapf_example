@@ -1,12 +1,9 @@
 #include "planner_starter_code.hpp"
 
-
-std::ostream& operator<<(std::ostream& os, const Point& point)
-{
-    os << "(" << point.x << ", " << point.y << ")";
-    return os;
+std::ostream &operator<<(std::ostream &os, const Point &point) {
+   os << "(" << point.x << ", " << point.y << ")";
+   return os;
 }
-
 
 // --------------- Grid ---------------
 
