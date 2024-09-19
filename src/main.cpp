@@ -15,9 +15,6 @@
         ./run
 */
 
-
-
-
 int main() {
    auto grid = std::make_shared<Grid>(10, 10);
 

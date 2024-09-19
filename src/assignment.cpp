@@ -115,7 +115,7 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
    solution.clear();
 
    // manage any problem unbalance
-   if (m_goals.size() > m_robots.size()) {  // more goals than robots
+   if (m_goals.size() > m_robots.size()) { // more goals than robots
       size_t robots_to_add = m_goals.size() - m_robots.size();
       assert(robots_to_add > 0);
       if (robots_to_add > MAX_AUGMENTED_ENTITIES) {
@@ -126,14 +126,14 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
          throw std::invalid_argument(exception_msg);
       }
       for (auto goal_iter = m_goals.left.begin();
-         goal_iter != m_goals.left.end(); ++goal_iter) {
+           goal_iter != m_goals.left.end(); ++goal_iter) {
          for (size_t idx = 0; idx < robots_to_add; ++idx)
-            // insert a fake placeholder robot to balance the number of goals (it has to be unique since it's going into a bimap)
+            // insert a fake placeholder robot to balance the number of goals
+            // (it has to be unique since it's going into a bimap)
             set_cost(Robot(-1 * int(idx + 1), Point({0, 0})), goal_iter->first,
                      MAX_EDGE_COST);
       }
-   }
-   else if (m_robots.size() > m_goals.size()) {  // more robots than goals
+   } else if (m_robots.size() > m_goals.size()) { // more robots than goals
       size_t goals_to_add = m_robots.size() - m_goals.size();
       assert(goals_to_add > 0);
       if (goals_to_add > MAX_AUGMENTED_ENTITIES) {
@@ -144,17 +144,20 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
          throw std::invalid_argument(exception_msg);
       }
       for (auto bot_iter = m_robots.left.begin();
-         bot_iter != m_robots.left.end(); ++bot_iter) {
+           bot_iter != m_robots.left.end(); ++bot_iter) {
          for (size_t idx = 0; idx < goals_to_add; ++idx)
-            // insert a fake placeholder goal to balance the number of robots (it has to be unique since it's going into a bimap)
-            set_cost(bot_iter->first, Point({-1 * int(idx + 1), -1}), MAX_EDGE_COST);
+            // insert a fake placeholder goal to balance the number of robots
+            // (it has to be unique since it's going into a bimap)
+            set_cost(bot_iter->first, Point({-1 * int(idx + 1), -1}),
+                     MAX_EDGE_COST);
       }
    }
 
 #ifdef DEBUG
    printf("%zu robots, %zu goals\n", m_robots.size(), m_goals.size());
 #endif
-   assert(m_robots.size() == m_goals.size());  // the problem should now be balanced
+   assert(m_robots.size() ==
+          m_goals.size()); // the problem should now be balanced
    boost::successive_shortest_path_nonnegative_weights(
        m_graph, m_src_vx, m_sink_vx,
        boost::capacity_map(get(&Edge::m_capacity, m_graph))
@@ -178,8 +181,10 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
                assert(edge_cost > 0);
                const Point &cur_pt = m_goals.right.at(goal_vx);
                if (edge_cost >= MAX_EDGE_COST) {
-                  if (cur_pt.x >= 0) 
-                     unallocated_goals.push_back(cur_pt); // record this goal as unallocated (unless it's a placeholder goal)
+                  if (cur_pt.x >= 0)
+                     unallocated_goals.push_back(
+                         cur_pt); // record this goal as unallocated (unless
+                                  // it's a placeholder goal)
                   continue;
                }
                solution[m_robots.right.at(robot_vx)] = cur_pt;
