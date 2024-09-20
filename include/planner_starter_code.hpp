@@ -13,59 +13,16 @@
 #include <unordered_set>
 #include <vector>
 
-#include "point.h"
 #include "grid_search.h"
-
-#if 0
-struct Point {
-   int x, y;
-
-   inline bool operator==(const Point &other) const {
-      return x == other.x && y == other.y;
-   }
-
-   inline int LinfDistance(const Point &other) const {
-      return std::min(std::abs(x - other.x), std::abs(y - other.y));
-   }
-
-   inline int L1Distance(const Point &other) const {
-      return std::abs(x - other.x) + std::abs(y - other.y);
-   }
-
-   struct Hash {
-      size_t operator()(const Point &self) const {
-         size_t seed = 0;
-         boost::hash_combine(seed, self.x);
-         boost::hash_combine(seed, self.y);
-         return seed;
-      }
-   };
-
-   struct Equality {
-      bool operator()(const Point &lhs, const Point &rhs) const {
-         return lhs == rhs;
-      }
-   };
-};
-
-// used to enable Point objects to be used as keys in unordered maps or sets.
-namespace std {
-template <> struct hash<Point> {
-   size_t operator()(const Point &p) const {
-      return hash<int>()(p.x) ^ hash<int>()(p.y);
-   }
-};
-} // namespace std
-
-std::ostream &operator<<(std::ostream &os, const Point &point);
-#endif
+#include "point.h"
 
 // --------------- Grid ---------------
 
 class Grid {
  public:
    Grid(int width, int height)
-       : width(width), height(height), newDigLocation(false), gridSearch(width, height) {}
+       : width(width), height(height), newDigLocation(false),
+         gridSearch(width, height) {}
 
    bool isValidCell(const Point &p) const;
 
@@ -104,8 +61,10 @@ class Grid {
    int getWidth();
    int getHeight();
 
-   std::size_t get_path(const Point &start_pt, const Point &end_pt, std::vector<Point> &path);
-   Point find_best_dropoff_path(const Point &start_pt, std::vector<Point> &path);
+   std::size_t get_path(const Point &start_pt, const Point &end_pt,
+                        std::vector<Point> &path);
+   Point find_best_dropoff_path(const Point &start_pt,
+                                std::vector<Point> &path);
 
  private:
    int width, height;
@@ -128,7 +87,7 @@ class Robot {
        : id(id), position(start), busy(false), digGoal(false) {}
 
    void setGoal(const Point &goal);
-   inline Point getGoal() {return goal;}
+   inline Point getGoal() { return goal; }
 
    void executePlan(const std::vector<Point> &plan, bool dig_goal = false);
 
@@ -184,9 +143,7 @@ class Robot {
 
 class Planner {
  public:
-   Planner(std::shared_ptr<Grid> grid) : grid(grid), totalTime(0) {
-
-   }
+   Planner(std::shared_ptr<Grid> grid) : grid(grid), totalTime(0) {}
 
    void addRobot(std::shared_ptr<Robot> robot);
 
@@ -199,9 +156,7 @@ class Planner {
    // std::unordered_map<std::shared_ptr<Robot>, std::vector<Point>>
 
    int estimateDistanceHeuristic(const Point &start_pt, const Point &end_pt);
-   void replan(); 
-
-
+   void replan();
 };
 
 void printState(const std::shared_ptr<Grid> &grid,

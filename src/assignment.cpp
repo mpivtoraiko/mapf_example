@@ -1,9 +1,8 @@
 #include <boost/graph/successive_shortest_path_nonnegative_weights.hpp>
+#include <stdexcept>
 
 #include "assignment.h"
 #include "planner_starter_code.hpp"
-
-#include <stdexcept>
 
 #ifdef DEBUG
 #include <cstdio>
@@ -68,8 +67,6 @@ void Assignment::set_cost(const Robot &robot, const Point &goal,
       robot_vx = boost::add_vertex(m_graph);
       upsert_edge(m_src_vx, robot_vx, 0);
       m_robots.insert(robot_map_t::value_type(robot, robot_vx));
-      // cout << "Adding robot " << robot.get_id() << " [" << robot_vx << "]" <<
-      // endl;
    } else {
       robot_vx = robot_iter->second;
    }
@@ -79,7 +76,6 @@ void Assignment::set_cost(const Robot &robot, const Point &goal,
    if (goal_iter == m_goals.left.end()) {
       goal_vx = boost::add_vertex(m_graph);
       upsert_edge(goal_vx, m_sink_vx, 0);
-      // cout << "Adding goal " << goal << " [" << goal_vx << "]" << endl;
       m_goals.insert(goal_map_t::value_type(goal, goal_vx));
    } else {
       goal_vx = goal_iter->second;
@@ -89,9 +85,6 @@ void Assignment::set_cost(const Robot &robot, const Point &goal,
 }
 
 void Assignment::upsert_edge(vertex_t src_vx, vertex_t sink_vx, int32_t cost) {
-   // std::cout << "Inserting " << src_vx << " -> " << sink_vx << ", cost " <<
-   // cost << std::endl;
-
    auto edge = boost::edge(src_vx, sink_vx, m_graph);
    if (edge.second) {
       m_graph[edge.first].m_cost = cost;

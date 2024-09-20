@@ -1,8 +1,5 @@
 #pragma once
 
-// #ifndef ASSIGNMENT_H
-// #define ASSIGNMENT_H
-
 #include <boost/bimap.hpp>
 #include <boost/bimap/unordered_set_of.hpp>
 #include <boost/graph/adjacency_list.hpp>
@@ -65,5 +62,3 @@ class Assignment {
    vertex_t m_src_vx;
    vertex_t m_sink_vx;
 };
-
-// #endif // ASSIGNMENT_H

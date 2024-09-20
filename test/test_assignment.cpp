@@ -1,8 +1,8 @@
 #define BOOST_TEST_MODULE AssignmentTests
-#include <boost/test/included/unit_test.hpp>
-#include <iostream>
 
 #include "assignment.h"
+#include <boost/test/included/unit_test.hpp>
+#include <iostream>
 
 using namespace std;
 
@@ -82,10 +82,6 @@ BOOST_AUTO_TEST_CASE(UnbalancedAssignmentMoreGoals) {
    BOOST_CHECK(solution[bot2] == goal3);
    BOOST_CHECK(solution[bot3] == goal2);
    BOOST_CHECK(unallocated_goals.size() == 2);
-   // for (auto pt_iter = unallocated_goals.begin(); pt_iter !=
-   // unallocated_goals.end(); ++pt_iter) {
-   //    cout << *pt_iter << endl;
-   // }
 }
 
 BOOST_AUTO_TEST_CASE(UnbalancedAssignmentMoreRobots) {
