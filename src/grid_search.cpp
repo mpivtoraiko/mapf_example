@@ -2,9 +2,7 @@
 
 #include "grid_search.h"
 
-
-
-std::size_t GridSearch::solve(std::vector<Point> & solution) {
+std::size_t GridSearch::solve(std::vector<Point> &solution) {
    solution.clear();
 
    boost::static_property_map<std::size_t> edge_cost(1);
@@ -21,7 +19,7 @@ std::size_t GridSearch::solve(std::vector<Point> & solution) {
    GridHeuristic heuristic(m_goal_vx);
    GoalVisitor goal_visitor(m_goal_vx);
 
-  try {
+   try {
       astar_search(m_barrier_grid, m_start_vx, heuristic,
                    boost::weight_map(edge_cost)
                        .predecessor_map(pred_property_map)
@@ -38,4 +36,3 @@ std::size_t GridSearch::solve(std::vector<Point> & solution) {
 
    return 0;
 }
-

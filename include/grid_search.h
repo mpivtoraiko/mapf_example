@@ -12,9 +12,10 @@
 
 #include "planner_starter_code.hpp"
 
-
-#define POINT_TO_VX_DESCRIPTOR(pt)  {{(long unsigned int)pt.x, ((long unsigned int)pt.y)}}
-
+#define POINT_TO_VX_DESCRIPTOR(pt)                                             \
+   {                                                                           \
+      { (long unsigned int)pt.x, ((long unsigned int)pt.y) }                   \
+   }
 
 typedef boost::grid_graph<2> SearchGrid;
 typedef boost::graph_traits<SearchGrid>::vertex_descriptor VertexDescriptor;
@@ -35,20 +36,23 @@ typedef boost::vertex_subset_complement_filter<SearchGrid, VertexSet>::type
 
 class GridSearch {
  public:
-   GridSearch(std::size_t x_dim, std::size_t y_dim) : 
-      m_grid(boost::array<std::size_t, 2>({ {x_dim, y_dim} })),
-      m_barrier_grid(boost::make_vertex_subset_complement_filter(m_grid, m_barriers))
-   {}
+   GridSearch(std::size_t x_dim, std::size_t y_dim)
+       : m_grid(boost::array<std::size_t, 2>({{x_dim, y_dim}})),
+         m_barrier_grid(
+             boost::make_vertex_subset_complement_filter(m_grid, m_barriers)) {}
 
-   void set_start(const Point &start_pt) {m_start_vx = POINT_TO_VX_DESCRIPTOR(start_pt);}
-   void set_goal(const Point &goal_pt)   {m_goal_vx  = POINT_TO_VX_DESCRIPTOR(goal_pt);}
-
+   void set_start(const Point &start_pt) {
+      m_start_vx = POINT_TO_VX_DESCRIPTOR(start_pt);
+   }
+   void set_goal(const Point &goal_pt) {
+      m_goal_vx = POINT_TO_VX_DESCRIPTOR(goal_pt);
+   }
 
    void set_obstacle(const Point &obstacle_pt) {
       m_barriers.insert(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
    }
 
-   std::size_t solve(std::vector<Point> & solution);
+   std::size_t solve(std::vector<Point> &solution);
 
  private:
    VertexDescriptor m_start_vx;
@@ -57,10 +61,9 @@ class GridSearch {
    SearchGrid m_grid;
    FilteredSearchGrid m_barrier_grid;
    VertexSet m_barriers;
-   //VertexSet m_solution;
+   // VertexSet m_solution;
    std::size_t m_solution_length;
 };
-
 
 class GridHeuristic
     : public boost::astar_heuristic<FilteredSearchGrid, std::size_t> {
