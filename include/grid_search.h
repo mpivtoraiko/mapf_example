@@ -10,7 +10,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 
-#include "planner_starter_code.hpp"
+#include "point.h"
 
 #define POINT_TO_VX_DESCRIPTOR(pt)                                             \
    {                                                                           \
@@ -50,6 +50,10 @@ class GridSearch {
 
    void set_obstacle(const Point &obstacle_pt) {
       m_barriers.insert(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
+   }
+
+   void unset_obstacle(const Point &obstacle_pt) {
+      m_barriers.erase(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
    }
 
    std::size_t solve(std::vector<Point> &solution);

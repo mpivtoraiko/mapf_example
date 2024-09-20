@@ -2,10 +2,15 @@
 
 #ifdef DEBUG
 #include <cstdio>
+#include <ostream>
 #endif
+
+#include <stdexcept>
 
 #include "assignment.h"
 #include "planner_starter_code.hpp"
+
+#define EXCEPTION_MSG_MAX_SIZE 1024
 
 using namespace std;
 
@@ -25,24 +30,30 @@ bool Grid::isValidCell(const Point &p) const {
 void Grid::setObstacle(const Point &p) {
    if (isValidCell(p)) {
       obstacles.insert(p);
+      gridSearch.set_obstacle(p);
    }
 }
 
 void Grid::setDropoffLocation(const Point &p) {
    if (isValidCell(p)) {
-      dropOffLocations[p] =
-          0; // initially drop off locations have 0 accumulative load
+      // initially drop off locations have 0 accumulative load
+      dropOffLocations[p] = 0; 
+      //gridSearch.set_obstacle(p);
    }
 }
 
 void Grid::setDigLocation(const Point &p) {
    if (isValidCell(p)) {
       digLocations.insert(p);
+      //gridSearch.set_obstacle(p);
+      newDigLocation = true;
    }
-   newDigLocation = true;
 }
 
-void Grid::clearDigLocation(const Point &p) { digLocations.erase(p); }
+void Grid::clearDigLocation(const Point &p) { 
+   digLocations.erase(p); 
+   gridSearch.unset_obstacle(p);
+}
 
 bool Grid::isObstacle(const Point &p) const { return obstacles.count(p); }
 
@@ -84,6 +95,42 @@ std::vector<Point> Grid::getNeighbors(const Point &p) {
    return neighbors;
 }
 
+
+std::size_t Grid::get_path(const Point &start_pt, const Point &end_pt, std::vector<Point> &path)
+{
+   path.clear();
+   gridSearch.set_start(start_pt);
+   gridSearch.set_goal(end_pt);
+   std::size_t path_cost = gridSearch.solve(path);
+   if (path_cost == 0) {
+      char exception_msg[EXCEPTION_MSG_MAX_SIZE];
+      snprintf(exception_msg, EXCEPTION_MSG_MAX_SIZE,
+               "Grid search failed: (%d, %d) -> (%d, %d)",
+               start_pt.x, start_pt.y, end_pt.x, end_pt.y);
+      throw std::invalid_argument(exception_msg);
+   }
+   return path_cost;
+}
+
+
+Point Grid::find_best_dropoff_path(const Point &start_pt, std::vector<Point> &path)
+{
+   std::size_t min_dist = 100000;
+   Point best_dropoff;
+   path.clear();
+   for (auto cur_dropoff = dropOffLocations.begin(); cur_dropoff != dropOffLocations.end(); ++cur_dropoff) {
+      vector<Point> cur_path;
+      std::size_t cur_dist = get_path(start_pt, cur_dropoff->first, cur_path);
+      if (cur_dist < min_dist) {
+         min_dist = cur_dist;
+         path = cur_path;
+         best_dropoff = cur_dropoff->first;
+      }
+   }
+   return best_dropoff;
+}
+
+
 // --------------- Robot ---------------
 
 void Robot::setGoal(const Point &goal) {
@@ -97,10 +144,15 @@ void Robot::executePlan(const std::vector<Point> &plan, bool dig_goal) {
    busy = true;
    digGoal = dig_goal;
    position = plan[0];
+   // cout << "R" << id << ": ";
+   // for (auto cur_pt : plan) {
+   //    cout << cur_pt << ", ";
+   // }
+   // cout << endl;
 }
 
 void Robot::advancePlan() {
-   if (++currentPlanStep >= currentPlan.size()) {
+   if (++currentPlanStep >= (currentPlan.size() - (digGoal ? 0 : 1))) {
       // finished this plan, reset
       cout << "Robot " << id << " completed plan " << currentPlan[0] << " -> "
            << currentPlan.back() << endl;
@@ -132,6 +184,19 @@ void Robot::clearPlan() {
    currentPlanStep = 0;
    currentPlan.clear();
 }
+
+
+bool Robot::isInActivePath(const Point &check_pt) {
+   if (currentPlan.size() == 0)
+      return false;
+   for (auto cur_pt : currentPlan) {
+      if (cur_pt == check_pt) 
+         return true;
+   }
+   return false;
+}
+
+
 // --------------- Planner ---------------
 
 void Planner::addRobot(std::shared_ptr<Robot> robot) {
@@ -151,17 +216,25 @@ void Planner::monitor() {
       if (cur_bot->isBusy()) {
          bool dig_goal = cur_bot->isDigGoal();
          printf("busy, ");
-         dig_goal ? printf("to dig") : printf("to dropoff");
+         dig_goal ? printf("to dig\n") : printf("to dropoff\n");
          cur_bot->advancePlan(); // if at the end of the plan, will switch to
                                  // idle internally
-         if (!cur_bot->isBusy() && dig_goal) {
-            // bot just got idle, so it arrived; if it was a dig goal, then dig
-            cur_bot->dig(grid);
-            printf(", DUG!");
-            // TODO: compute and set the plan to dropoff (global CBS)
+         if (!cur_bot->isBusy()) { // bot just got idle, so it arrived           
+            if (dig_goal) { // if it was a dig goal, then dig
+               cur_bot->dig(grid);
+               vector<Point> dropoff_path;
+               Point dropoff = grid->find_best_dropoff_path(cur_bot->getCurrentPosition(), dropoff_path);
+               cur_bot->setGoal(dropoff);
+               cur_bot->executePlan(dropoff_path, false);
+            }
+            else { // it was a dropoff goal
+               grid->addToDropOffLocation(cur_bot->getGoal());
+               replan();
+            }
          }
-      }
-      printf("\n");
+      } // if (cur_bot->isBusy()) 
+      else
+         printf("idle\n");
    } // end for (auto cur_bot : robots)
 
    if (!grid->isNewDigLocation())
@@ -171,6 +244,19 @@ void Planner::monitor() {
    // dropoff
    printf("New digs!\n");
    grid->acknowledgeNewDigLocation();
+   replan();
+}
+
+int Planner::estimateDistanceHeuristic(const Point &start_pt,
+                                       const Point &end_pt) {
+   //return start_pt.L1Distance(end_pt); // L1 distance for now
+   std::vector<Point> path;
+   return int(grid->get_path(start_pt, end_pt, path));
+}
+
+
+void Planner::replan() 
+{
    vector<shared_ptr<Robot>> available_robots;
    for (auto cur_bot : robots) {
       if (cur_bot->isBusy()) {
@@ -198,12 +284,12 @@ void Planner::monitor() {
         sol_iter != solution.end(); ++sol_iter) {
       // TODO: the inner loop below is needed since sol_iter->first is returned
       // as a const. Would need to move away from the std::map container.
-      // printf("  R%d -> (%d, %d)\n", sol_iter->first.get_id(),
-      // sol_iter->second.x, sol_iter->second.y);
       for (auto cur_bot : robots) {
          if (cur_bot->get_id() == sol_iter->first.get_id()) {
             cur_bot->setGoal(sol_iter->second);
-            // TODO:
+            std::vector<Point> path;
+            grid->get_path(cur_bot->getCurrentPosition(), sol_iter->second, path);
+            cur_bot->executePlan(path, true);
             break;
          }
       }
@@ -212,17 +298,25 @@ void Planner::monitor() {
    // TODO: run CBS and set plans to all bots
 }
 
-int Planner::estimateDistanceHeuristic(const Point &start_pt,
-                                       const Point &end_pt) {
-   return start_pt.L1Distance(end_pt); // L1 distance for now
-}
-
 void printState(const std::shared_ptr<Grid> &grid,
                 const std::vector<std::shared_ptr<Robot>> &robots) {
    for (int x = 0; x < grid->getWidth(); ++x) {
       for (int y = 0; y < grid->getHeight(); ++y) {
          Point p{x, y};
          std::string cell = ".";
+
+         for (const auto &robot : robots) {
+            if (robot->getCurrentPosition() == p) {
+               cell = "R";
+               break;            
+            }
+            // check if this point is in any motion plans
+            if (robot->isInActivePath(p)) {
+               cell = "*";
+               break;
+            }
+         }
+
          if (grid->isObstacle(p)) {
             cell = "#";
          } else if (grid->isDigLocation(p)) {
@@ -230,15 +324,12 @@ void printState(const std::shared_ptr<Grid> &grid,
          } else if (grid->isDropoffLocation(p)) {
             cell = std::to_string(grid->getDropOffLocationValue(p));
          }
-         for (const auto &robot : robots) {
-            if (robot->getCurrentPosition() == p) {
-               cell = to_string(robot->get_id());
-               break;
-            }
-         }
+
          std::cout << cell << ' ';
       }
       std::cout << std::endl;
    }
    std::cout << std::endl;
 }
+
+

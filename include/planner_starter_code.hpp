@@ -1,3 +1,6 @@
+#ifndef PLANNER_STARTER_CODE_H
+#define PLANNER_STARTER_CODE_H
+
 #include <algorithm>
 #include <boost/functional/hash.hpp>
 #include <cmath>
@@ -10,9 +13,10 @@
 #include <unordered_set>
 #include <vector>
 
-#ifndef PLANNER_STARTER_CODE_H
-#define PLANNER_STARTER_CODE_H
+#include "point.h"
+#include "grid_search.h"
 
+#if 0
 struct Point {
    int x, y;
 
@@ -54,13 +58,14 @@ template <> struct hash<Point> {
 } // namespace std
 
 std::ostream &operator<<(std::ostream &os, const Point &point);
+#endif
 
 // --------------- Grid ---------------
 
 class Grid {
  public:
    Grid(int width, int height)
-       : width(width), height(height), newDigLocation(false) {}
+       : width(width), height(height), newDigLocation(false), gridSearch(width, height) {}
 
    bool isValidCell(const Point &p) const;
 
@@ -99,6 +104,9 @@ class Grid {
    int getWidth();
    int getHeight();
 
+   std::size_t get_path(const Point &start_pt, const Point &end_pt, std::vector<Point> &path);
+   Point find_best_dropoff_path(const Point &start_pt, std::vector<Point> &path);
+
  private:
    int width, height;
    std::unordered_set<Point, Point::Hash, Point::Equality> obstacles;
@@ -108,6 +116,8 @@ class Grid {
 
    std::vector<Point> getNeighbors(const Point &p);
    bool newDigLocation;
+
+   GridSearch gridSearch;
 };
 
 // --------------- Robot ---------------
@@ -118,6 +128,7 @@ class Robot {
        : id(id), position(start), busy(false), digGoal(false) {}
 
    void setGoal(const Point &goal);
+   inline Point getGoal() {return goal;}
 
    void executePlan(const std::vector<Point> &plan, bool dig_goal = false);
 
@@ -138,6 +149,8 @@ class Robot {
    inline bool isBusy() { return busy; }
 
    inline bool isDigGoal() { return digGoal; }
+
+   bool isInActivePath(const Point &check_pt);
 
    struct Hash {
       size_t operator()(const Robot &a) const {
@@ -171,7 +184,9 @@ class Robot {
 
 class Planner {
  public:
-   Planner(std::shared_ptr<Grid> grid) : grid(grid), totalTime(0) {}
+   Planner(std::shared_ptr<Grid> grid) : grid(grid), totalTime(0) {
+
+   }
 
    void addRobot(std::shared_ptr<Robot> robot);
 
@@ -184,6 +199,9 @@ class Planner {
    // std::unordered_map<std::shared_ptr<Robot>, std::vector<Point>>
 
    int estimateDistanceHeuristic(const Point &start_pt, const Point &end_pt);
+   void replan(); 
+
+
 };
 
 void printState(const std::shared_ptr<Grid> &grid,
