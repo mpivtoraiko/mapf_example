@@ -1,30 +1,31 @@
 #include <algorithm>
+#include <boost/functional/hash.hpp>
 #include <cmath>
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <ostream>
 #include <random>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include <ostream>
-
-#include <boost/functional/hash.hpp>
-
 #ifndef PLANNER_STARTER_CODE_H
 #define PLANNER_STARTER_CODE_H
-
-// class Point {
-//  public:
-//    Point();
-//    Point(int x_input, int y_input);
 
 struct Point {
    int x, y;
 
    inline bool operator==(const Point &other) const {
       return x == other.x && y == other.y;
+   }
+
+   inline int LinfDistance(const Point &other) const {
+      return std::min(std::abs(x - other.x), std::abs(y - other.y));
+   }
+
+   inline int L1Distance(const Point &other) const {
+      return std::abs(x - other.x) + std::abs(y - other.y);
    }
 
    struct Hash {
@@ -58,7 +59,8 @@ std::ostream &operator<<(std::ostream &os, const Point &point);
 
 class Grid {
  public:
-   Grid(int width, int height) : width(width), height(height) {}
+   Grid(int width, int height)
+       : width(width), height(height), newDigLocation(false) {}
 
    bool isValidCell(const Point &p) const;
 
@@ -69,6 +71,15 @@ class Grid {
    void setDigLocation(const Point &p);
 
    void clearDigLocation(const Point &p);
+
+   inline bool isNewDigLocation() { return newDigLocation; }
+
+   inline void acknowledgeNewDigLocation() { newDigLocation = false; }
+
+   inline const std::unordered_set<Point, Point::Hash, Point::Equality> &
+   getDigLocations() {
+      return digLocations;
+   }
 
    bool isObstacle(const Point &p) const;
 
@@ -96,17 +107,23 @@ class Grid {
    std::unordered_set<Point, Point::Hash, Point::Equality> digLocations;
 
    std::vector<Point> getNeighbors(const Point &p);
+   bool newDigLocation;
 };
 
 // --------------- Robot ---------------
 
 class Robot {
  public:
-   Robot(int id, const Point &start) : id(id), position(start) {}
+   Robot(int id, const Point &start)
+       : id(id), position(start), busy(false), digGoal(false) {}
 
    void setGoal(const Point &goal);
 
-   void executePlan(const std::vector<Point> &plan);
+   void executePlan(const std::vector<Point> &plan, bool dig_goal = false);
+
+   void advancePlan();
+
+   void clearPlan();
 
    Point getCurrentPosition() const;
 
@@ -117,6 +134,10 @@ class Robot {
    }
 
    int get_id() const { return id; }
+
+   inline bool isBusy() { return busy; }
+
+   inline bool isDigGoal() { return digGoal; }
 
    struct Hash {
       size_t operator()(const Robot &a) const {
@@ -140,7 +161,10 @@ class Robot {
    int id;
    Point position;
    Point goal;
-   bool isBusy = false;
+   bool busy;
+   bool digGoal;
+   std::vector<Point> currentPlan;
+   size_t currentPlanStep;
 };
 
 // --------------- Planner ---------------
@@ -157,6 +181,9 @@ class Planner {
    std::shared_ptr<Grid> grid;
    std::vector<std::shared_ptr<Robot>> robots;
    int totalTime;
+   // std::unordered_map<std::shared_ptr<Robot>, std::vector<Point>>
+
+   int estimateDistanceHeuristic(const Point &start_pt, const Point &end_pt);
 };
 
 void printState(const std::shared_ptr<Grid> &grid,

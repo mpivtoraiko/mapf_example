@@ -4,7 +4,10 @@
 #include "planner_starter_code.hpp"
 
 #include <stdexcept>
-// #include <cstdio>
+
+#ifdef DEBUG
+#include <cstdio>
+#endif
 
 #define EXCEPTION_MSG_MAX_SIZE 1024
 #define MAX_AUGMENTED_ENTITIES 10

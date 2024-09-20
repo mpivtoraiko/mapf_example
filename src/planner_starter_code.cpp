@@ -1,4 +1,15 @@
+#define DEBUG
+
+#ifdef DEBUG
+#include <cstdio>
+#endif
+
+#include "assignment.h"
 #include "planner_starter_code.hpp"
+
+using namespace std;
+
+// --------------- Point ---------------
 
 std::ostream &operator<<(std::ostream &os, const Point &point) {
    os << "(" << point.x << ", " << point.y << ")";
@@ -28,6 +39,7 @@ void Grid::setDigLocation(const Point &p) {
    if (isValidCell(p)) {
       digLocations.insert(p);
    }
+   newDigLocation = true;
 }
 
 void Grid::clearDigLocation(const Point &p) { digLocations.erase(p); }
@@ -58,26 +70,6 @@ int Grid::getCombinedDropOffLocationValues() {
 int Grid::getWidth() { return width; }
 int Grid::getHeight() { return height; }
 
-// --------------- Robot ---------------
-
-void Robot::setGoal(const Point &goal) { this->goal = goal; }
-
-void Robot::executePlan(const std::vector<Point> &plan) {
-   for (const auto &p : plan) {
-      position = p;
-   }
-}
-
-Point Robot::getCurrentPosition() const { return position; }
-
-void Robot::dig(std::shared_ptr<Grid> grid) {
-   if (grid->isDigLocation(position)) {
-      grid->clearDigLocation(position);
-      std::cout << "Robot " << id << " dug at position (" << position.x << ", "
-                << position.y << ")" << std::endl;
-   }
-}
-
 std::vector<Point> Grid::getNeighbors(const Point &p) {
    std::vector<Point> neighbors;
    std::vector<Point> directions = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
@@ -92,6 +84,54 @@ std::vector<Point> Grid::getNeighbors(const Point &p) {
    return neighbors;
 }
 
+// --------------- Robot ---------------
+
+void Robot::setGoal(const Point &goal) {
+   this->goal = goal;
+   cout << "Robot " << id << " to " << goal << endl;
+}
+
+void Robot::executePlan(const std::vector<Point> &plan, bool dig_goal) {
+   currentPlan = plan;
+   currentPlanStep = 0;
+   busy = true;
+   digGoal = dig_goal;
+   position = plan[0];
+}
+
+void Robot::advancePlan() {
+   if (++currentPlanStep >= currentPlan.size()) {
+      // finished this plan, reset
+      cout << "Robot " << id << " completed plan " << currentPlan[0] << " -> "
+           << currentPlan.back() << endl;
+      currentPlanStep = 0;
+      currentPlan.clear();
+      busy = false;
+      digGoal = false;
+      // position member should still be accurate after the previous call to
+      // this f-n
+      return;
+   }
+   position = currentPlan[currentPlanStep];
+   return;
+}
+
+Point Robot::getCurrentPosition() const { return position; }
+
+void Robot::dig(std::shared_ptr<Grid> grid) {
+   if (grid->isDigLocation(position)) {
+      grid->clearDigLocation(position);
+      std::cout << "Robot " << id << " dug at position (" << position.x << ", "
+                << position.y << ")" << std::endl;
+   }
+}
+
+void Robot::clearPlan() {
+   busy = false;
+   digGoal = false;
+   currentPlanStep = 0;
+   currentPlan.clear();
+}
 // --------------- Planner ---------------
 
 void Planner::addRobot(std::shared_ptr<Robot> robot) {
@@ -102,8 +142,79 @@ void Planner::addRobot(std::shared_ptr<Robot> robot) {
 // dig locations)
 //  and creates plans for the robots accordingly.
 void Planner::monitor() {
+   ++totalTime;
 
-   // TODO: add code here
+   printf("t = %d\n", totalTime);
+
+   for (auto cur_bot : robots) {
+      printf("R%d: ", cur_bot->get_id());
+      if (cur_bot->isBusy()) {
+         bool dig_goal = cur_bot->isDigGoal();
+         printf("busy, ");
+         dig_goal ? printf("to dig") : printf("to dropoff");
+         cur_bot->advancePlan(); // if at the end of the plan, will switch to
+                                 // idle internally
+         if (!cur_bot->isBusy() && dig_goal) {
+            // bot just got idle, so it arrived; if it was a dig goal, then dig
+            cur_bot->dig(grid);
+            printf(", DUG!");
+            // TODO: compute and set the plan to dropoff (global CBS)
+         }
+      }
+      printf("\n");
+   } // end for (auto cur_bot : robots)
+
+   if (!grid->isNewDigLocation())
+      return; // if no new dig locations, we're done
+
+   // got new dig location(s): force a replan for all robots not moving to a
+   // dropoff
+   printf("New digs!\n");
+   grid->acknowledgeNewDigLocation();
+   vector<shared_ptr<Robot>> available_robots;
+   for (auto cur_bot : robots) {
+      if (cur_bot->isBusy()) {
+         if (cur_bot->isDigGoal()) {
+            cur_bot->clearPlan();
+            available_robots.push_back(cur_bot);
+         }
+      } else
+         available_robots.push_back(cur_bot);
+   }
+
+   Assignment assignment;
+   for (auto cur_bot : available_robots) {
+      for (auto cur_pt : grid->getDigLocations()) {
+         //         Point bot_position = cur_bot->getCurrentPosition();
+         uint32_t cost =
+             estimateDistanceHeuristic(cur_bot->getCurrentPosition(), cur_pt);
+         assignment.set_cost(*cur_bot, cur_pt, cost);
+      }
+   }
+   std::map<Robot, Point> solution;
+   std::list<Point> unallocated_goals;
+   assignment.run_solver(solution, unallocated_goals);
+   for (map<Robot, Point>::iterator sol_iter = solution.begin();
+        sol_iter != solution.end(); ++sol_iter) {
+      // TODO: the inner loop below is needed since sol_iter->first is returned
+      // as a const. Would need to move away from the std::map container.
+      // printf("  R%d -> (%d, %d)\n", sol_iter->first.get_id(),
+      // sol_iter->second.x, sol_iter->second.y);
+      for (auto cur_bot : robots) {
+         if (cur_bot->get_id() == sol_iter->first.get_id()) {
+            cur_bot->setGoal(sol_iter->second);
+            // TODO:
+            break;
+         }
+      }
+   }
+
+   // TODO: run CBS and set plans to all bots
+}
+
+int Planner::estimateDistanceHeuristic(const Point &start_pt,
+                                       const Point &end_pt) {
+   return start_pt.L1Distance(end_pt); // L1 distance for now
 }
 
 void printState(const std::shared_ptr<Grid> &grid,
@@ -121,7 +232,7 @@ void printState(const std::shared_ptr<Grid> &grid,
          }
          for (const auto &robot : robots) {
             if (robot->getCurrentPosition() == p) {
-               cell = "R";
+               cell = to_string(robot->get_id());
                break;
             }
          }

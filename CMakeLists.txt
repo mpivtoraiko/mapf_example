@@ -14,7 +14,9 @@ find_package(Boost 1.71.0 COMPONENTS graph unit_test_framework REQUIRED)
 
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
-add_library(planner SHARED src/planner_starter_code.cpp src/assignment.cpp)
+add_library(planner SHARED src/planner_starter_code.cpp 
+                           src/assignment.cpp
+                           src/grid_search.cpp)
 target_include_directories(planner PRIVATE ./include ${Boost_INCLUDE_DIRS})
 target_link_libraries(planner ${Boost_LIBRARIES})
 
@@ -32,3 +34,7 @@ target_link_libraries(test_starter_code planner ${Boost_UNIT_TEST_FRAMEWORK_LIBR
 add_executable(test_assignment test/test_assignment.cpp)
 target_include_directories(test_assignment PRIVATE ./include)
 target_link_libraries(test_assignment planner ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
+
+add_executable(test_grid_search test/test_grid_search.cpp)
+target_include_directories(test_grid_search PRIVATE ./include)
+target_link_libraries(test_grid_search planner ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
