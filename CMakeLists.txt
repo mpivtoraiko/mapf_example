@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.15...3.30)
 project(excavator_problem VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_BUILD_TYPE Debug)
 
@@ -12,11 +13,12 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 
 find_package(Boost 1.71.0 COMPONENTS graph unit_test_framework REQUIRED) 
 
-#add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
 add_library(planner SHARED src/planner_starter_code.cpp 
                            src/assignment.cpp
-                           src/grid_search.cpp)
+                           src/grid_search.cpp
+                           src/conflict_based_search.cpp)
 target_include_directories(planner PRIVATE ./include ${Boost_INCLUDE_DIRS})
 target_link_libraries(planner ${Boost_LIBRARIES})
 
@@ -42,10 +44,3 @@ target_link_libraries(test_grid_search planner ${Boost_UNIT_TEST_FRAMEWORK_LIBRA
 add_executable(test_conflict_based_search test/test_conflict_based_search.cpp)
 target_include_directories(test_conflict_based_search PRIVATE ./include)
 target_link_libraries(test_conflict_based_search planner ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
-
-
-# add_executable(bfs_demo test/bfs_demo.cpp)
-# target_link_libraries(bfs_demo ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
-
-# add_executable(bfs_demo_implicit test/bfs_demo_implicit.cpp)
-# target_link_libraries(bfs_demo_implicit ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
