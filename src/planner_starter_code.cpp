@@ -34,6 +34,15 @@ void Grid::setObstacle(const Point &p) {
    }
 }
 
+
+void Grid::unsetObstacle(const Point &p) {
+   if (isValidCell(p)) {
+      obstacles.erase(p);
+      gridSearch.unset_obstacle(p);
+   }
+}
+
+
 void Grid::setDropoffLocation(const Point &p) {
    if (isValidCell(p)) {
       // initially drop off locations have 0 accumulative load
