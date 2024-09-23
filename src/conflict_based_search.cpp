@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <cstdio>
 #include <queue>
+#include <boost/log/trivial.hpp>
 
 #include "conflict_based_search.h"
 
@@ -12,17 +13,12 @@ char exception_msg[EXCEPTION_MSG_MAX_SIZE];
 
 using namespace std;
 
+// logger setup
+using namespace boost::log::trivial;
+boost::log::sources::severity_logger< severity_level > lg;
 
 
-
-std::ostream & operator<<(std::ostream& os, TrajectoryConflictMap const& conflict_map)
-{
-   for (const auto & [bot_idx, conflicts] : conflict_map) {
-      os << "  " << bot_idx << ": " << conflicts << endl;
-   }
-   return os;
-}
-
+/*     ----------------     Output Functions     ----------------     */
 
 std::ostream & operator<<(std::ostream& os, Path const& path) 
 {
@@ -52,6 +48,16 @@ std::ostream & operator<<(std::ostream& os, const Trajectory & trajectory)
 {
    for (const auto & cur_state : trajectory) {
       os << cur_state << " ";
+   }
+   return os;
+}
+
+/*     ----------------     TrajectoryConflictMap     ----------------     */
+
+std::ostream & operator<<(std::ostream& os, TrajectoryConflictMap const& conflict_map)
+{
+   for (const auto & [bot_idx, conflicts] : conflict_map) {
+      os << "  " << bot_idx << ": " << conflicts << endl;
    }
    return os;
 }
@@ -146,7 +152,6 @@ void ConflictBasedSearch::print_plans(const TrajectorySet &state_plans) const
          // draw plans
          for (auto cur_plan : state_plans) {
             for (auto cur_state : cur_plan) {
-               //printf("trying %zu, %zu\n", cur_state.m_x, cur_state.m_y);
                if (cur_state.m_x == size_t(x) && cur_state.m_y == size_t(y)) {
                   snprintf(cell_label, 10, " %zu ", cur_state.m_time);
                   cell = string(cell_label).substr(0, 3);
@@ -195,17 +200,17 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
    // root node
    PathSet paths;
    size_t node_cost = this->grid_search(start_positions, goal_positions, TrajectoryConflictMap(), paths);
-   cout << "Paths:" << endl << paths << endl;
+   BOOST_LOG_SEV(lg, trace) << "Paths:" << endl << paths << endl;
 
    TrajectoryConflictMap new_conflicts;
    if (this->check_conflicts(paths, new_conflicts) == 0) {
-      cout << "No conflicts!" << endl;
+      BOOST_LOG_SEV(lg, debug) << "No conflicts!" << endl;
       // TODO: check if there are ties, and if so, look for the one at shallowest depth (minimize constraints)
       output_paths = paths; // prepare the return value
       return 0;
    }
 
-   cout << new_conflicts;
+   BOOST_LOG_SEV(lg, trace) << new_conflicts;
    search_queue.push(CBSTreeNode(new_conflicts, node_cost));
 
    size_t num_iterations = 0;
@@ -213,7 +218,7 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
       const CBSTreeNode & node = search_queue.top();
       ++num_iterations; 
 
-      cout << "***" << endl << "#" << num_iterations << endl << node << endl;
+      BOOST_LOG_SEV(lg, debug) << "***" << endl << "#" << num_iterations << endl << node << endl;
 
       // for all the conflict combinations found, enqueue them as children
       vector<TrajectoryConflictMap> conflict_combinations;
@@ -221,19 +226,19 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
 
       // generate successors
       for (const auto & cur_combination : conflict_combinations) {
-         cout << "New succ: " << cur_combination << endl;
+         BOOST_LOG_SEV(lg, debug) << "New succ: " << cur_combination << endl;
 
 
          node_cost = this->grid_search(start_positions, goal_positions, cur_combination, paths);
          if (node_cost == 0) {
             // we're unable to find this plan, so skip this successor
-            cout << "No path" << endl;
+            BOOST_LOG_SEV(lg, debug) << "No path" << endl;
             continue;
          }
-         cout << "cost " << node_cost << ", paths:" << endl << paths << endl;
+         BOOST_LOG_SEV(lg, trace) << "cost " << node_cost << ", paths:" << endl << paths << endl;
 
          if (this->check_conflicts(paths, new_conflicts) == 0) {
-            cout << "No conflicts!" << endl;
+            BOOST_LOG_SEV(lg, debug) << "No conflicts!" << endl;
             // TODO: check if there are ties, and if so, look for the one at shallowest depth (minimize constraints)
             output_paths = paths; // prepare the return value
             return num_iterations;
@@ -241,11 +246,11 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
 
          cout << new_conflicts;
          search_queue.push(CBSTreeNode(cur_combination, node_cost));
-         cout << "queue size " << search_queue.size() << endl;
+         BOOST_LOG_SEV(lg, trace) << "queue size " << search_queue.size() << endl;
       }
     }
 
-    printf("Warning: no solution found after %zu iterations\n", num_iterations);
+    BOOST_LOG_SEV(lg, error) << "No solution found after " << num_iterations << " iterations" << endl;
     return num_iterations;
 }
 

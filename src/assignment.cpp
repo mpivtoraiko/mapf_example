@@ -112,7 +112,7 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
    uint32_t cost = 0;
    solution.clear();
 
-   // manage any problem unbalance
+   // manage any problem imbalance
    if (m_goals.size() > m_robots.size()) { // more goals than robots
       size_t robots_to_add = m_goals.size() - m_robots.size();
       assert(robots_to_add > 0);
