@@ -28,6 +28,8 @@ class Grid {
 
    void setObstacle(const Point &p);
 
+   void unsetObstacle(const Point &p);
+
    void setDropoffLocation(const Point &p);
 
    void setDigLocation(const Point &p);

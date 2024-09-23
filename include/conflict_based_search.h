@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <ostream>
 
 #include "planner_starter_code.hpp"
 
@@ -14,7 +15,7 @@ struct RobotState {
    std::size_t m_time;
 
    inline bool operator==(const RobotState &other) const {
-      return m_x == other.m_x && m_y == other.m_y;
+      return m_x == other.m_x && m_y == other.m_y && m_time == other.m_time;
    }
 
    inline Point to_point() {return Point({int(m_x), int(m_y)});}
@@ -29,28 +30,50 @@ template <> struct std::hash<RobotState> {
 };
 
 
-typedef std::vector<std::vector<RobotState>> PathSet;
-typedef std::tuple<RobotState, std::vector<std::size_t>> PathConflict;
+typedef std::vector<Point> Path;
+typedef std::vector<Path> PathSet;
+typedef std::vector<RobotState> Trajectory; // a time-based path
+typedef std::vector<Trajectory> TrajectorySet;
+//typedef std::tuple<RobotState, std::vector<std::size_t>> PathConflict;
+typedef std::pair<std::size_t, Trajectory> TrajectoryConflict;
+//typedef std::shared_ptr<TrajectoryConflict> TrajectoryConflictPtr;
+typedef std::unordered_set<TrajectoryConflict> TrajectoryConflictSet;
+
+
+template <> struct std::hash<TrajectoryConflict> {
+   std::size_t operator()(const TrajectoryConflict &self) const;
+};
+
+
+std::ostream & operator<<(std::ostream& os, TrajectoryConflict const& conflict);
+std::ostream & operator<<(std::ostream& os, TrajectoryConflictSet const& conflict_set);
+
+std::ostream & operator<<(std::ostream& os, Path const& path);
+std::ostream & operator<<(std::ostream& os, PathSet const& path_set);
 
 class CBSTreeNode {
  public:
-   CBSTreeNode() {}
-   CBSTreeNode(const std::vector<PathConflict> & conflicts) : m_conflicts = conflicts {}
+   CBSTreeNode(std::size_t num_robots);
+   CBSTreeNode(const TrajectoryConflictSet & conflicts, std::size_t cost) : m_conflicts(conflicts), m_total_cost(cost) {}
 
-   std::size_t check_conflicts();
-   void generate_combinations(std::vector<std::vector<PathConflict>> &conflict_combinations); // a recursive f-n that generates combinations
-
-   PathSet & get_paths() {return m_paths;} // return a reference to paths to be set by the planner
+   // return a reference to (volatile) paths to be set by the planner
+   //inline PathSet & get_path_set() {return m_paths;} 
 
    //inline bool no_conflicts() {return m_conflicts.size() == 0;}
-   inline const std::vector<PathConflict> & get_conflicts() {return m_conflicts;}
+   inline const TrajectoryConflictSet & get_conflicts() const {return m_conflicts;}
+   //inline std::size_t get_cost() const {return m_total_cost;}
+   inline void set_cost(std::size_t cost) {m_total_cost = cost;}
+
+   friend bool operator>(CBSTreeNode const& lhs, CBSTreeNode const& rhs) {
+      return lhs.m_total_cost > rhs.m_total_cost;
+   }
+
+   friend std::ostream & operator<<(std::ostream& os, CBSTreeNode const& node);
 
  private:
-   PathSet m_paths;
-   std::vector<PathConflict> m_conflicts;
+   //PathSet m_paths;
+   TrajectoryConflictSet m_conflicts;
    std::size_t m_total_cost;
-   //std::vector<std::shared_ptr<CBSTreeNode>> m_children;
-   //std::shared_ptr<Grid> m_grid;
 };
 
 
@@ -59,28 +82,26 @@ class ConflictBasedSearch {
    ConflictBasedSearch(std::shared_ptr<Grid> grid, std::size_t num_robots) : m_num_robots(num_robots),
                                                                              m_grid(grid) {}
 
-   void set_goals(const std::vector<RobotState> &robot_goals);
+   std::size_t search(const std::vector<Point> &start_positions,
+               const std::vector<Point> &goal_positions,
+               PathSet &output_paths);
 
-   void search(const std::vector<Point> &start_positions,
-                                const std::vector<Point> &goal_positions);
-
-   void grid_search(const std::vector<Point> &start_positions, 
-             const std::vector<Point> &goal_positions,
-             const std::vector<PathConflict> &conflicts,
-             std::vector<std::vector<RobotState>> &state_plans);
+   std::size_t  grid_search(const std::vector<Point> &start_positions, 
+                    const std::vector<Point> &goal_positions,
+                    const TrajectoryConflictSet &conflicts,
+                    PathSet &state_plans);
 
 
-   void print_plans(const std::vector<std::vector<RobotState>> &state_plans);
+   void print_plans(const TrajectorySet &state_plans) const;
+
+   void pathset2trajset(const PathSet & path_set, TrajectorySet & traj_set);
+
+   void generate_combinations(const TrajectoryConflictSet &conflicts,
+                              std::vector<TrajectoryConflictSet> &conflict_combinations) const; // a recursive f-n that generates combinations
+   std::size_t check_conflicts(const PathSet &paths, TrajectoryConflictSet &conflicts);
 
  protected:
-   // void enumerate_conflicts
-
-   //         std::unordered_map < std::size_t,
-   //     vector<RobotState> m_vertices;
 
    std::size_t m_num_robots;
-   // std::vector<RobotState> m_robot_goals;
-
-
    std::shared_ptr<Grid> m_grid;
 };
