@@ -13,48 +13,11 @@ char exception_msg[EXCEPTION_MSG_MAX_SIZE];
 using namespace std;
 
 
-// void ConflictBasedSearch::set_goals(const std::vector<RobotState> &robot_goals)
-// {
-//    if (robot_goals.size() != m_num_robots) {
-//       snprintf(exception_msg, EXCEPTION_MSG_MAX_SIZE,
-//                "Attempting to set a wrong number of robot goals: %zu vs %zu",
-//                robot_goals.size(), m_num_robots);
-//       throw std::invalid_argument(exception_msg);
-//    }
-//    m_robot_goals = robot_goals;
-// }
 
-
-/*     ----------------     TrajectoryConflict     ----------------     */
-
-size_t hash<TrajectoryConflict>::operator()(const TrajectoryConflict &self) const {
-   size_t seed = 0;
-   boost::hash_combine(seed, self.first);
-   for (const auto &cur_state : self.second) {
-      boost::hash_combine(seed, cur_state.m_x);
-      boost::hash_combine(seed, cur_state.m_y);
-      boost::hash_combine(seed, cur_state.m_time);
-   }   
-   return seed;
-}
-
-
-std::ostream & operator<<(std::ostream& os, const TrajectoryConflict & conflict) {
-   os << "[" << conflict.first << ", ";
-   for (auto cur_state : conflict.second) {
-      os << "(" << cur_state.m_x << ", " << cur_state.m_y << ", " << cur_state.m_time << ") ";
-   }
-   os << "]"; 
-   return os;
-}
-
-
-
-std::ostream & operator<<(std::ostream& os, TrajectoryConflictSet const& conflict_set)
+std::ostream & operator<<(std::ostream& os, TrajectoryConflictMap const& conflict_map)
 {
-   os << "Conflict set of " << conflict_set.size() << ":" << endl;
-   for (const auto & cur_conflict : conflict_set) {
-      os << "  " << cur_conflict << endl;
+   for (const auto & [bot_idx, conflicts] : conflict_map) {
+      os << "  " << bot_idx << ": " << conflicts << endl;
    }
    return os;
 }
@@ -78,19 +41,26 @@ std::ostream & operator<<(std::ostream& os, PathSet const& path_set)
 }
 
 
-/*     ----------------     CBSTreeNode     ----------------     */
-CBSTreeNode::CBSTreeNode(std::size_t num_robots) : m_total_cost(0)
+std::ostream & operator<<(std::ostream& os, RobotState const& robot_state) 
 {
-   for (size_t bot_idx = 0; bot_idx < num_robots; ++bot_idx) {
-      pair<size_t, Trajectory> cur_pair(bot_idx, Trajectory());
-      m_conflicts.insert(cur_pair);
+   os << "(" << robot_state.m_x << ", " << robot_state.m_y << ", " << robot_state.m_time << ")";
+   return os;
+}
+
+std::ostream & operator<<(std::ostream& os, const Trajectory & trajectory)
+{
+   for (const auto & cur_state : trajectory) {
+      os << cur_state << " ";
    }
+   return os;
 }
 
 
+/*     ----------------     CBSTreeNode     ----------------     */
+
 
 std::ostream & operator<<(std::ostream& os, CBSTreeNode const& node) {
-   os << "cost " << node.m_total_cost << ", " << node.m_conflicts;
+   os << "cost " << node.m_total_cost << endl << node.m_conflicts; 
    return os;
 }
 
@@ -100,10 +70,9 @@ std::ostream & operator<<(std::ostream& os, CBSTreeNode const& node) {
 /*     ----------------     ConflictBasedSearch     ----------------     */
 
 
-
 std::size_t ConflictBasedSearch::grid_search(const std::vector<Point> &start_positions,
                                       const std::vector<Point> &goal_positions,
-                                      const TrajectoryConflictSet &conflicts,
+                                      const TrajectoryConflictMap &conflicts,
                                       PathSet &paths)
 {
    paths.clear();
@@ -115,27 +84,39 @@ std::size_t ConflictBasedSearch::grid_search(const std::vector<Point> &start_pos
    size_t total_cost = 0;
 
    for (size_t bot_idx = 0; bot_idx < m_num_robots; ++bot_idx) {
-      // block off cells per conflicts for each robot
-      for (const auto & cur_conflict : conflicts) {
-         if (cur_conflict.first != bot_idx) {  
-            continue; // skip other robots
-         }
-         for (const auto & cur_state : cur_conflict.second) {           
+      // block off cells per conflicts, if any, for each robot
+      const auto & bot_key = conflicts.find(bot_idx);
+      size_t path_cost = 0;
+      if (bot_key == conflicts.end()) {
+         // no conflicts for this bot, so just plan without cost map modification
+         path_cost = m_grid->get_path(start_positions[bot_idx], goal_positions[bot_idx], paths[bot_idx]);
+      }
+      else {
+         // we've got conflicts, implement them in the cost map
+         for (const auto & cur_state : bot_key->second) {           
             m_grid->setObstacle(STATE_TO_POINT(cur_state));
          }
 
-         // replan the point paths per established constraints   
-         size_t cost = m_grid->get_path(start_positions[bot_idx], goal_positions[bot_idx], paths[bot_idx]);
-
+         // replan the point paths per established constraints
+         try { 
+            path_cost = m_grid->get_path(start_positions[bot_idx], goal_positions[bot_idx], paths[bot_idx]);
+         }
+         catch (const std::invalid_argument & exception_obj) {
+            path_cost = 0; // planner failed; proceed to map recover, then early terminate
+         }
          // undo robot conflicts
-         for (const auto & cur_state : cur_conflict.second) {
+         for (const auto & cur_state : bot_key->second) {
             // not checking for special cells (dig or dropoff locations bc the plan 
             // should already avoid them, so they can't be a conflict             
             m_grid->unsetObstacle(STATE_TO_POINT(cur_state));
          }
 
-         total_cost += cost;
-      }   // for (const auto & cur_conflict : conflicts)
+         // early termination in case of planner failure
+         if (path_cost == 0) {
+            return 0;
+         }
+      }  // else (bot_key == conflicts.end())
+      total_cost += path_cost;
    }   // for (size_t bot_idx = 0; bot_idx < m_num_robots; ++bot_idx)
 
    return total_cost;
@@ -179,16 +160,12 @@ void ConflictBasedSearch::print_plans(const TrajectorySet &state_plans) const
             cell = string(cell_label).substr(0, 3);
          }
 
-         std::cout << cell; // << ' ';
+         std::cout << cell; 
       }
       std::cout << std::endl;
    }
    std::cout << std::endl;
 }
-
-
-
-
 
 
 std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_positions,
@@ -204,12 +181,11 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
    std::priority_queue<CBSTreeNode, vector<CBSTreeNode>, std::greater<CBSTreeNode>> search_queue;
 
    // root node
-   CBSTreeNode root_node(m_num_robots);
    PathSet paths;
-   size_t node_cost = this->grid_search(start_positions, goal_positions, root_node.get_conflicts(), paths);
+   size_t node_cost = this->grid_search(start_positions, goal_positions, TrajectoryConflictMap(), paths);
    cout << "Paths:" << endl << paths << endl;
 
-   TrajectoryConflictSet new_conflicts;
+   TrajectoryConflictMap new_conflicts;
    if (this->check_conflicts(paths, new_conflicts) == 0) {
       cout << "No conflicts!" << endl;
       // TODO: check if there are ties, and if so, look for the one at shallowest depth (minimize constraints)
@@ -217,7 +193,7 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
       return 0;
    }
 
-   cout << new_conflicts << endl << endl;
+   cout << new_conflicts;
    search_queue.push(CBSTreeNode(new_conflicts, node_cost));
 
    size_t num_iterations = 0;
@@ -225,21 +201,25 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
       const CBSTreeNode & node = search_queue.top();
       ++num_iterations; 
 
-      cout << "***" << endl << "#" << num_iterations << ": " << node;
+      cout << "***" << endl << "#" << num_iterations << endl << node << endl;
 
       // for all the conflict combinations found, enqueue them as children
-      vector<TrajectoryConflictSet> conflict_combinations;
+      vector<TrajectoryConflictMap> conflict_combinations;
       this->generate_combinations(node.get_conflicts(), conflict_combinations);
 
       // generate successors
       for (const auto & cur_combination : conflict_combinations) {
          cout << "New succ: " << cur_combination << endl;
-         //PathSet paths;
+
 
          node_cost = this->grid_search(start_positions, goal_positions, cur_combination, paths);
+         if (node_cost == 0) {
+            // we're unable to find this plan, so skip this successor
+            cout << "No path" << endl;
+            continue;
+         }
          cout << "cost " << node_cost << ", paths:" << endl << paths << endl;
 
-         //TrajectoryConflictSet new_conflicts;
          if (this->check_conflicts(paths, new_conflicts) == 0) {
             cout << "No conflicts!" << endl;
             // TODO: check if there are ties, and if so, look for the one at shallowest depth (minimize constraints)
@@ -247,8 +227,9 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
             return num_iterations;
          }
 
-         cout << new_conflicts << endl << endl;
+         cout << new_conflicts;
          search_queue.push(CBSTreeNode(cur_combination, node_cost));
+         cout << "queue size " << search_queue.size() << endl;
       }
     }
 
@@ -257,7 +238,61 @@ std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_position
 }
 
 
-std::size_t ConflictBasedSearch::check_conflicts(const PathSet &paths, TrajectoryConflictSet &conflicts)
+
+
+#if 0
+std::size_t ConflictBasedSearch::search(const std::vector<Point> &start_positions,
+                                 const std::vector<Point> &goal_positions,
+                                 PathSet &output_paths)
+{
+   output_paths.clear();
+
+   assert(start_positions.size() == m_num_robots);
+   assert( goal_positions.size() == m_num_robots);
+
+   // setup the priority queue
+   std::priority_queue<CBSTreeNode, vector<CBSTreeNode>, std::greater<CBSTreeNode>> search_queue;
+
+   search_queue.push(CBSTreeNode());
+
+   size_t num_iterations = 0;
+   for (; search_queue.empty() == false; search_queue.pop()) {
+      const CBSTreeNode & node = search_queue.top();
+      ++num_iterations; 
+
+      cout << "***" << endl << "#" << num_iterations << ": " << node;
+
+      PathSet paths;
+      size_t node_cost = this->grid_search(start_positions, goal_positions, node.get_conflicts(), paths);
+      cout << "cost " << node_cost << ", paths:" << endl << paths << endl;
+
+      TrajectoryConflictMap new_conflicts;
+      if (this->check_conflicts(paths, new_conflicts) == 0) {
+         cout << "No conflicts!" << endl;
+         // TODO: check if there are ties, and if so, look for the one at shallowest depth (minimize constraints)
+         output_paths = paths; // prepare the return value
+         return num_iterations;
+      }
+
+      cout << new_conflicts;
+      // for all the conflict combinations found, enqueue them as children
+      vector<TrajectoryConflictMap> conflict_combinations;
+      this->generate_combinations(new_conflicts, conflict_combinations);
+
+      // generate successors
+      for (const auto & cur_combination : conflict_combinations) {
+         cout << "New succ: " << cur_combination << endl;
+         search_queue.push(CBSTreeNode(cur_combination, node_cost));
+         cout << "queue size " << search_queue.size() << endl;
+      }
+    }    // for (; search_queue.empty() == false; search_queue.pop())
+
+    printf("Warning: no solution found after %zu iterations\n", num_iterations);
+    return num_iterations;
+}
+#endif
+
+std::size_t ConflictBasedSearch::check_conflicts(const PathSet &paths, TrajectoryConflictMap &conflicts)
 {
    conflicts.clear();
 
@@ -276,16 +311,19 @@ std::size_t ConflictBasedSearch::check_conflicts(const PathSet &paths, Trajector
    // step through all paths and detect conflicts
    for (size_t path_step = 0; path_step < max_path_len; ++path_step) {
       for (size_t bot_idx = 0; bot_idx < paths.size(); ++bot_idx) {
+         if (path_step >= paths[bot_idx].size()) {
+            continue;; // we're done checking this path
+         }
          const Point &cur_pt = paths[bot_idx][path_step];
          for (size_t other_idx = (bot_idx + 1); other_idx < paths.size(); ++other_idx) {
+            if (path_step >= paths[other_idx].size()) {
+               continue;; // we're done checking this path
+            }
             const Point &other_pt = paths[other_idx][path_step];
             if (cur_pt == other_pt) {
-               //TrajectoryConflict obj()
-               //m_conflicts.insert(make_pair<size_t, Trajectory>(bot_idx, {RobotState({size_t(cur_pt.x), size_t(cur_pt.y), path_step})}));
-               Trajectory conflict_traj({RobotState({size_t(cur_pt.x), size_t(cur_pt.y), path_step})});
-               conflicts.insert(TrajectoryConflict(bot_idx,   conflict_traj));
-               conflicts.insert(TrajectoryConflict(other_idx, conflict_traj));
-               //m_conflicts.insert(make_pair<size_t, Trajectory>(bot_idx, {RobotState({size_t(cur_pt.x), size_t(cur_pt.y), path_step})}));
+               RobotState conflict_state({size_t(cur_pt.x), size_t(cur_pt.y), path_step});
+               conflict_map_append(bot_idx, conflict_state, conflicts);
+               conflict_map_append(other_idx, conflict_state, conflicts);
             }
          }
       } 
@@ -295,15 +333,28 @@ std::size_t ConflictBasedSearch::check_conflicts(const PathSet &paths, Trajector
 
 
 
-void ConflictBasedSearch::generate_combinations(const TrajectoryConflictSet &conflicts,
-                                                std::vector<TrajectoryConflictSet> &conflict_combinations) const
+void ConflictBasedSearch::generate_combinations(const TrajectoryConflictMap &conflict_map,
+                                                std::vector<TrajectoryConflictMap> &conflict_combinations) const
 {
    conflict_combinations.clear();
-   for (const auto & cur_conflict : conflicts) {
-      TrajectoryConflictSet cur_conflict_set;
-      cur_conflict_set.insert(cur_conflict);
-      conflict_combinations.push_back(cur_conflict_set);
+
+   for (const auto & [bot_idx, all_conflicts] : conflict_map) {
+      for (size_t end_idx = 0; end_idx < all_conflicts.size(); ++end_idx) {
+         Trajectory cur_conflicts;
+         for (size_t start_idx = 0; start_idx <= end_idx; ++start_idx) {
+            cur_conflicts.push_back(all_conflicts[start_idx]);
+         }
+         TrajectoryConflictMap new_map;
+         new_map.insert({bot_idx, cur_conflicts});
+         conflict_combinations.push_back(new_map);
+      }
    }
+
+   cout << "Generated " << conflict_combinations.size() << " combinations:" << endl;
+   for (const auto & cur_combination : conflict_combinations) {
+      cout << cur_combination;
+   }
+   cout << endl;
 }
 
 
