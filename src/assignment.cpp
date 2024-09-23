@@ -1,10 +1,9 @@
 #include <boost/graph/successive_shortest_path_nonnegative_weights.hpp>
-#include <stdexcept>
 #include <boost/log/trivial.hpp>
+#include <stdexcept>
 
 #include "assignment.h"
 #include "planner_starter_code.hpp"
-
 
 #define EXCEPTION_MSG_MAX_SIZE 1024
 #define MAX_AUGMENTED_ENTITIES 10
@@ -15,7 +14,6 @@ using namespace std;
 // logger setup
 using namespace boost::log::trivial;
 extern boost::log::sources::severity_logger<severity_level> lg;
-
 
 Assignment::Assignment() {
    m_src_vx = boost::add_vertex(m_graph);
@@ -109,7 +107,7 @@ void Assignment::upsert_edge(vertex_t src_vx, vertex_t sink_vx, int cost) {
 }
 
 std::size_t Assignment::run_solver(std::map<Robot, Point> &solution,
-                                std::list<Point> &unallocated_goals) {
+                                   std::list<Point> &unallocated_goals) {
    std::size_t cost = 0;
    solution.clear();
 
@@ -152,7 +150,8 @@ std::size_t Assignment::run_solver(std::map<Robot, Point> &solution,
       }
    }
 
-   BOOST_LOG_SEV(lg, debug) << m_robots.size() << " robots, " <<  m_goals.size() << " goals" << endl;
+   BOOST_LOG_SEV(lg, debug)
+       << m_robots.size() << " robots, " << m_goals.size() << " goals" << endl;
    assert(m_robots.size() ==
           m_goals.size()); // the problem should now be balanced
    boost::successive_shortest_path_nonnegative_weights(
@@ -189,10 +188,10 @@ std::size_t Assignment::run_solver(std::map<Robot, Point> &solution,
 
                // a debug print
                char printout[EXCEPTION_MSG_MAX_SIZE];
-               snprintf(printout, EXCEPTION_MSG_MAX_SIZE, "R %d [%zu] -> Pt (%d, %d) [%zu]: %d [%zu]\n",
-                        m_robots.right.at(robot_vx).get_id(), robot_vx, 
-                        cur_pt.x, cur_pt.y, goal_vx, 
-                        edge_cost, cost);
+               snprintf(printout, EXCEPTION_MSG_MAX_SIZE,
+                        "R %d [%zu] -> Pt (%d, %d) [%zu]: %d [%zu]\n",
+                        m_robots.right.at(robot_vx).get_id(), robot_vx,
+                        cur_pt.x, cur_pt.y, goal_vx, edge_cost, cost);
                BOOST_LOG_SEV(lg, debug) << printout << endl;
 
                break;

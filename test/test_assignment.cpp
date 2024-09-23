@@ -1,8 +1,8 @@
 #define BOOST_TEST_MODULE AssignmentTests
 
-#include <boost/test/included/unit_test.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/console.hpp>
+#include <boost/test/included/unit_test.hpp>
 
 #include "assignment.h"
 
@@ -18,7 +18,7 @@ void init_logger() {
 
 BOOST_AUTO_TEST_CASE(BalancedAssignment) {
    init_logger();
-   
+
    Robot bot1(1, Point({1, 2}));
    Robot bot2(2, Point({2, 1}));
    Robot bot3(3, Point({3, 2}));

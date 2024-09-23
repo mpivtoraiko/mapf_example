@@ -1,9 +1,8 @@
-#include <cassert>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/console.hpp>
+#include <cassert>
 
 #include "planner_starter_code.hpp"
-
 
 /*
 
@@ -21,12 +20,10 @@
 
 void init_logger() {
    namespace logging = boost::log;
-   logging::add_console_log(std::cout, logging::keywords::format =
-                                           "%Message%");
+   logging::add_console_log(std::cout, logging::keywords::format = "%Message%");
    logging::core::get()->set_filter(logging::trivial::severity >=
                                     logging::trivial::info);
 }
-
 
 int main() {
    init_logger();

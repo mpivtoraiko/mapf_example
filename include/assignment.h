@@ -11,9 +11,17 @@ class Assignment {
  public:
    Assignment();
 
+   /**
+    * The primary way of building the graph externally: providing the cost
+    * heuristic for a robot to reach a particular goal.
+    */
    void set_cost(const Robot &robot, const Point &goal, std::size_t cost);
+
+   /**
+    * Once the graph is build, this function solves the assignment problem
+    */
    std::size_t run_solver(std::map<Robot, Point> &solution,
-                       std::list<Point> &unallocated_robots);
+                          std::list<Point> &unallocated_robots);
 
  protected:
    typedef boost::adjacency_list_traits<boost::vecS, boost::vecS,
@@ -22,8 +30,14 @@ class Assignment {
    typedef graphTraits_t::vertex_descriptor vertex_t;
    typedef graphTraits_t::edge_descriptor edge_t;
 
+   /**
+    * The vertex placeholder type
+    */
    struct Vertex {};
 
+   /**
+    * Graph edge type
+    */
    struct Edge {
       Edge()
           : m_cost(0), m_capacity(0), m_residual_capacity(0), m_reverse(),
@@ -36,6 +50,9 @@ class Assignment {
       bool m_is_reverse;
    };
 
+   /**
+    * Graph type
+    */
    typedef boost::adjacency_list<boost::vecS, boost::vecS,
                                  boost::bidirectionalS, Vertex, Edge>
        Graph;

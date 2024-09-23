@@ -15,6 +15,9 @@
       { (long unsigned int)pt.x, ((long unsigned int)pt.y) }                   \
    }
 
+/**
+ * Inner graph type and its vertex types
+ */
 typedef boost::grid_graph<2> SearchGrid;
 typedef boost::graph_traits<SearchGrid>::vertex_descriptor VertexDescriptor;
 typedef boost::graph_traits<SearchGrid>::vertices_size_type VertexSizeType;
@@ -32,12 +35,16 @@ typedef boost::unordered_set<VertexDescriptor, VertexHash> VertexSet;
 typedef boost::vertex_subset_complement_filter<SearchGrid, VertexSet>::type
     FilteredSearchGrid;
 
+/**
+ * Outer interface class
+ */
 class GridSearch {
  public:
    GridSearch(std::size_t x_dim, std::size_t y_dim)
        : m_grid(boost::array<std::size_t, 2>({{x_dim, y_dim}})),
          m_obstacle_grid(
-             boost::make_vertex_subset_complement_filter(m_grid, m_obstacles)) {}
+             boost::make_vertex_subset_complement_filter(m_grid, m_obstacles)) {
+   }
 
    void set_start(const Point &start_pt) {
       m_start_vx = POINT_TO_VX_DESCRIPTOR(start_pt);
@@ -66,6 +73,9 @@ class GridSearch {
    std::size_t m_solution_length;
 };
 
+/**
+ * A-star heuristic on a grid: L1-distance
+ */
 class GridHeuristic
     : public boost::astar_heuristic<FilteredSearchGrid, std::size_t> {
  public:
@@ -80,6 +90,10 @@ class GridHeuristic
    VertexDescriptor m_goal;
 };
 
+/**
+ * Termination condition: goal achievement and the type to
+ * throw as exception to interrupt the search
+ */
 struct FoundGoal {};
 
 struct GoalVisitor : public boost::default_astar_visitor {

@@ -1,6 +1,6 @@
-#include <stdexcept>
 #include <boost/log/trivial.hpp>
 #include <ostream>
+#include <stdexcept>
 
 #include "assignment.h"
 #include "conflict_based_search.h"
@@ -34,14 +34,12 @@ void Grid::setObstacle(const Point &p) {
    }
 }
 
-
 void Grid::unsetObstacle(const Point &p) {
    if (isValidCell(p)) {
       obstacles.erase(p);
       gridSearch.unset_obstacle(p);
    }
 }
-
 
 void Grid::setDropoffLocation(const Point &p) {
    if (isValidCell(p)) {
@@ -123,7 +121,7 @@ Point Grid::find_best_dropoff_path(const Point &start_pt,
    std::size_t min_dist = 100000;
    Point best_dropoff;
    path.clear();
-   for (const auto & [dropoff_pt, dropoff_count] : dropOffLocations) {
+   for (const auto &[dropoff_pt, dropoff_count] : dropOffLocations) {
       vector<Point> cur_path;
       std::size_t cur_dist = get_path(start_pt, dropoff_pt, cur_path);
       if (cur_dist < min_dist) {
@@ -153,15 +151,16 @@ void Robot::executePlan(const std::vector<Point> &plan, bool dig_goal) {
 void Robot::advancePlan() {
    if (++currentPlanStep >= (currentPlan.size() - (digGoal ? 0 : 1))) {
       // finished this plan, reset
-      BOOST_LOG_SEV(lg, info) << "Robot " << id << " completed plan " << currentPlan[0] << " -> "
-           << currentPlan.back() << endl;
+      BOOST_LOG_SEV(lg, info)
+          << "Robot " << id << " completed plan " << currentPlan[0] << " -> "
+          << currentPlan.back() << endl;
       currentPlanStep = 0;
       currentPlan.clear();
       busy = false;
       digGoal = false;
       // position member should still be accurate after the previous call to
       // this f-n
-      return;  // stopping bot, it remains at the current position
+      return; // stopping bot, it remains at the current position
    }
    position = currentPlan[currentPlanStep];
    return;
@@ -172,8 +171,9 @@ Point Robot::getCurrentPosition() const { return position; }
 void Robot::dig(std::shared_ptr<Grid> grid) {
    if (grid->isDigLocation(position)) {
       grid->clearDigLocation(position);
-      BOOST_LOG_SEV(lg, info) << "Robot " << id << " dug at position (" << position.x << ", "
-                << position.y << ")" << std::endl;
+      BOOST_LOG_SEV(lg, info)
+          << "Robot " << id << " dug at position (" << position.x << ", "
+          << position.y << ")" << std::endl;
    }
 }
 
@@ -187,7 +187,7 @@ void Robot::clearPlan() {
 bool Robot::isInActivePath(const Point &check_pt) {
    if (currentPlan.size() == 0)
       return false;
-   for (const auto & cur_pt : currentPlan) {
+   for (const auto &cur_pt : currentPlan) {
       if (cur_pt == check_pt)
          return true;
    }
@@ -215,8 +215,7 @@ void Planner::monitor() {
          BOOST_LOG_SEV(lg, info) << "busy, ";
          if (dig_goal) {
             BOOST_LOG_SEV(lg, info) << "to dig" << endl;
-         }
-         else {
+         } else {
             BOOST_LOG_SEV(lg, info) << "to dropoff" << endl;
          }
 
@@ -268,12 +267,14 @@ void Planner::replan() {
          available_robots.push_back(cur_bot);
    }
 
-   BOOST_LOG_SEV(lg, debug) << available_robots.size() << " robots, " << grid->getDigLocations().size() << " dig locations" << endl;
+   BOOST_LOG_SEV(lg, debug)
+       << available_robots.size() << " robots, "
+       << grid->getDigLocations().size() << " dig locations" << endl;
 
    // setup the assignment solver
    Assignment assignment;
    for (auto cur_bot : available_robots) {
-      for (const auto & cur_pt : grid->getDigLocations()) {
+      for (const auto &cur_pt : grid->getDigLocations()) {
          size_t cost =
              estimateDistanceHeuristic(cur_bot->getCurrentPosition(), cur_pt);
          assignment.set_cost(*cur_bot, cur_pt, cost);
@@ -283,13 +284,14 @@ void Planner::replan() {
    // run the assignment solver
    std::map<Robot, Point> solution;
    std::list<Point> unallocated_goals;
-   BOOST_LOG_SEV(lg, debug) << "available robots: " << available_robots.size() << endl;
+   BOOST_LOG_SEV(lg, debug)
+       << "available robots: " << available_robots.size() << endl;
    assignment.run_solver(solution, unallocated_goals);
 
    // setup start and goal point arrays to plug into CBS
    vector<Point> start_points;
-   vector<Point> goal_points;   
-   for (const auto & [solution_robot, solution_goal] : solution) {
+   vector<Point> goal_points;
+   for (const auto &[solution_robot, solution_goal] : solution) {
       start_points.push_back(solution_robot.getCurrentPosition());
       goal_points.push_back(solution_goal);
    }
@@ -300,10 +302,10 @@ void Planner::replan() {
    // set the computed paths for execution:
    // we reiterate through the assignment solution std::map in order
    // to make sure to preserve robot ID - to - vector index mapping
-   // that we used to setup the start_points vector 
+   // that we used to setup the start_points vector
    // (reconsider ConflictBasedSearch API to simplify this)
    size_t path_idx = 0;
-   for (const auto & [solution_robot, solution_goal] : solution) {
+   for (const auto &[solution_robot, solution_goal] : solution) {
       // TODO: the inner loop below is needed since sol_iter->first is returned
       // as a const. Would need to move away from the std::map container.
       for (auto cur_bot : robots) {
