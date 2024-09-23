@@ -1,11 +1,6 @@
-#define DEBUG
-
-#ifdef DEBUG
-#include <cstdio>
-#include <ostream>
-#endif
-
 #include <stdexcept>
+#include <boost/log/trivial.hpp>
+#include <ostream>
 
 #include "assignment.h"
 #include "conflict_based_search.h"
@@ -14,6 +9,10 @@
 #define EXCEPTION_MSG_MAX_SIZE 1024
 
 using namespace std;
+
+// logger setup
+using namespace boost::log::trivial;
+extern boost::log::sources::severity_logger<severity_level> lg;
 
 // --------------- Point ---------------
 
@@ -140,7 +139,7 @@ Point Grid::find_best_dropoff_path(const Point &start_pt,
 
 void Robot::setGoal(const Point &goal) {
    this->goal = goal;
-   cout << "Robot " << id << " to " << goal << endl;
+   BOOST_LOG_SEV(lg, info) << "Robot " << id << " to " << goal << endl;
 }
 
 void Robot::executePlan(const std::vector<Point> &plan, bool dig_goal) {
@@ -154,7 +153,7 @@ void Robot::executePlan(const std::vector<Point> &plan, bool dig_goal) {
 void Robot::advancePlan() {
    if (++currentPlanStep >= (currentPlan.size() - (digGoal ? 0 : 1))) {
       // finished this plan, reset
-      cout << "Robot " << id << " completed plan " << currentPlan[0] << " -> "
+      BOOST_LOG_SEV(lg, info) << "Robot " << id << " completed plan " << currentPlan[0] << " -> "
            << currentPlan.back() << endl;
       currentPlanStep = 0;
       currentPlan.clear();
@@ -173,7 +172,7 @@ Point Robot::getCurrentPosition() const { return position; }
 void Robot::dig(std::shared_ptr<Grid> grid) {
    if (grid->isDigLocation(position)) {
       grid->clearDigLocation(position);
-      std::cout << "Robot " << id << " dug at position (" << position.x << ", "
+      BOOST_LOG_SEV(lg, info) << "Robot " << id << " dug at position (" << position.x << ", "
                 << position.y << ")" << std::endl;
    }
 }
@@ -207,14 +206,20 @@ void Planner::addRobot(std::shared_ptr<Robot> robot) {
 void Planner::monitor() {
    ++totalTime;
 
-   printf("t = %d\n", totalTime);
+   BOOST_LOG_SEV(lg, info) << "t = " << totalTime << endl;
 
    for (auto cur_bot : robots) {
-      printf("R%d: ", cur_bot->get_id());
+      BOOST_LOG_SEV(lg, info) << "R" << cur_bot->get_id() << ": ";
       if (cur_bot->isBusy()) {
          bool dig_goal = cur_bot->isDigGoal();
-         printf("busy, ");
-         dig_goal ? printf("to dig\n") : printf("to dropoff\n");
+         BOOST_LOG_SEV(lg, info) << "busy, ";
+         if (dig_goal) {
+            BOOST_LOG_SEV(lg, info) << "to dig" << endl;
+         }
+         else {
+            BOOST_LOG_SEV(lg, info) << "to dropoff" << endl;
+         }
+
          cur_bot->advancePlan();   // if at the end of the plan, will switch to
                                    // idle internally
          if (!cur_bot->isBusy()) { // bot just got idle, so it arrived
@@ -232,7 +237,7 @@ void Planner::monitor() {
          }
       } // if (cur_bot->isBusy())
       else
-         printf("idle\n");
+         BOOST_LOG_SEV(lg, info) << "idle" << endl;
    } // end for (auto cur_bot : robots)
 
    if (!grid->isNewDigLocation())
@@ -240,7 +245,7 @@ void Planner::monitor() {
 
    // got new dig location(s): force a replan for all robots not moving to a
    // dropoff
-   printf("New digs!\n");
+   BOOST_LOG_SEV(lg, info) << "New dig!" << endl;
    grid->acknowledgeNewDigLocation();
    replan();
 }
@@ -263,13 +268,13 @@ void Planner::replan() {
          available_robots.push_back(cur_bot);
    }
 
-   cout << available_robots.size() << " robots, " << grid->getDigLocations().size() << " dig locations" << endl;
+   BOOST_LOG_SEV(lg, debug) << available_robots.size() << " robots, " << grid->getDigLocations().size() << " dig locations" << endl;
 
    // setup the assignment solver
    Assignment assignment;
    for (auto cur_bot : available_robots) {
       for (const auto & cur_pt : grid->getDigLocations()) {
-         uint32_t cost =
+         size_t cost =
              estimateDistanceHeuristic(cur_bot->getCurrentPosition(), cur_pt);
          assignment.set_cost(*cur_bot, cur_pt, cost);
       }
@@ -278,7 +283,7 @@ void Planner::replan() {
    // run the assignment solver
    std::map<Robot, Point> solution;
    std::list<Point> unallocated_goals;
-   cout << "available robots: " << available_robots.size() << endl;
+   BOOST_LOG_SEV(lg, debug) << "available robots: " << available_robots.size() << endl;
    assignment.run_solver(solution, unallocated_goals);
 
    // setup start and goal point arrays to plug into CBS

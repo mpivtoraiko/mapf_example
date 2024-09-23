@@ -11,8 +11,8 @@ class Assignment {
  public:
    Assignment();
 
-   void set_cost(const Robot &robot, const Point &goal, uint32_t cost);
-   uint32_t run_solver(std::map<Robot, Point> &solution,
+   void set_cost(const Robot &robot, const Point &goal, std::size_t cost);
+   std::size_t run_solver(std::map<Robot, Point> &solution,
                        std::list<Point> &unallocated_robots);
 
  protected:
@@ -29,9 +29,9 @@ class Assignment {
           : m_cost(0), m_capacity(0), m_residual_capacity(0), m_reverse(),
             m_is_reverse(false) {}
 
-      int32_t m_cost;
-      int32_t m_capacity;
-      int32_t m_residual_capacity;
+      int m_cost;
+      int m_capacity;
+      int m_residual_capacity;
       edge_t m_reverse;
       bool m_is_reverse;
    };
@@ -41,7 +41,7 @@ class Assignment {
        Graph;
 
    void reset_graph();
-   void upsert_edge(vertex_t src_vx, vertex_t sink_vx, int32_t cost);
+   void upsert_edge(vertex_t src_vx, vertex_t sink_vx, int cost);
 
  private:
    typedef boost::bimap<

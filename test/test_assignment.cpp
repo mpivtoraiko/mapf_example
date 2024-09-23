@@ -1,12 +1,24 @@
 #define BOOST_TEST_MODULE AssignmentTests
 
-#include "assignment.h"
 #include <boost/test/included/unit_test.hpp>
-#include <iostream>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/console.hpp>
+
+#include "assignment.h"
 
 using namespace std;
 
+void init_logger() {
+   namespace logging = boost::log;
+   logging::add_console_log(std::cout, logging::keywords::format =
+                                           "%Severity%\t%Message%");
+   logging::core::get()->set_filter(logging::trivial::severity >=
+                                    logging::trivial::info);
+}
+
 BOOST_AUTO_TEST_CASE(BalancedAssignment) {
+   init_logger();
+   
    Robot bot1(1, Point({1, 2}));
    Robot bot2(2, Point({2, 1}));
    Robot bot3(3, Point({3, 2}));
@@ -33,7 +45,7 @@ BOOST_AUTO_TEST_CASE(BalancedAssignment) {
 
    std::map<Robot, Point> solution;
    std::list<Point> unallocated_goals;
-   uint32_t total_cost = assignment.run_solver(solution, unallocated_goals);
+   size_t total_cost = assignment.run_solver(solution, unallocated_goals);
    BOOST_CHECK(total_cost == 30);
    BOOST_CHECK(solution[bot1] == goal1);
    BOOST_CHECK(solution[bot2] == goal3);
@@ -76,7 +88,7 @@ BOOST_AUTO_TEST_CASE(UnbalancedAssignmentMoreGoals) {
 
    std::map<Robot, Point> solution;
    std::list<Point> unallocated_goals;
-   uint32_t total_cost = assignment.run_solver(solution, unallocated_goals);
+   size_t total_cost = assignment.run_solver(solution, unallocated_goals);
    BOOST_CHECK(total_cost == 30);
    BOOST_CHECK(solution[bot1] == goal1);
    BOOST_CHECK(solution[bot2] == goal3);
@@ -103,7 +115,7 @@ BOOST_AUTO_TEST_CASE(UnbalancedAssignmentMoreRobots) {
 
    std::map<Robot, Point> solution;
    std::list<Point> unallocated_goals;
-   uint32_t total_cost = assignment.run_solver(solution, unallocated_goals);
+   size_t total_cost = assignment.run_solver(solution, unallocated_goals);
    BOOST_CHECK(total_cost == 10);
    BOOST_CHECK(solution[bot3] == goal1);
    BOOST_CHECK(unallocated_goals.size() == 0);

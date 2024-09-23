@@ -7,14 +7,6 @@ struct Point {
       return x == other.x && y == other.y;
    }
 
-   inline int LinfDistance(const Point &other) const {
-      return std::min(std::abs(x - other.x), std::abs(y - other.y));
-   }
-
-   inline int L1Distance(const Point &other) const {
-      return std::abs(x - other.x) + std::abs(y - other.y);
-   }
-
    struct Hash {
       size_t operator()(const Point &self) const {
          size_t seed = 0;

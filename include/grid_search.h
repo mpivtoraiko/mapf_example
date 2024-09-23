@@ -3,10 +3,8 @@
 #include <boost/graph/astar_search.hpp>
 #include <boost/graph/filtered_graph.hpp>
 #include <boost/graph/grid_graph.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/random/mersenne_twister.hpp>
+
 #include <boost/random/uniform_int.hpp>
-#include <boost/random/variate_generator.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 
@@ -38,8 +36,8 @@ class GridSearch {
  public:
    GridSearch(std::size_t x_dim, std::size_t y_dim)
        : m_grid(boost::array<std::size_t, 2>({{x_dim, y_dim}})),
-         m_barrier_grid(
-             boost::make_vertex_subset_complement_filter(m_grid, m_barriers)) {}
+         m_obstacle_grid(
+             boost::make_vertex_subset_complement_filter(m_grid, m_obstacles)) {}
 
    void set_start(const Point &start_pt) {
       m_start_vx = POINT_TO_VX_DESCRIPTOR(start_pt);
@@ -49,11 +47,11 @@ class GridSearch {
    }
 
    void set_obstacle(const Point &obstacle_pt) {
-      m_barriers.insert(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
+      m_obstacles.insert(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
    }
 
    void unset_obstacle(const Point &obstacle_pt) {
-      m_barriers.erase(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
+      m_obstacles.erase(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
    }
 
    std::size_t solve(std::vector<Point> &solution);
@@ -63,9 +61,8 @@ class GridSearch {
    VertexDescriptor m_goal_vx;
 
    SearchGrid m_grid;
-   FilteredSearchGrid m_barrier_grid;
-   VertexSet m_barriers;
-   // VertexSet m_solution;
+   FilteredSearchGrid m_obstacle_grid;
+   VertexSet m_obstacles;
    std::size_t m_solution_length;
 };
 

@@ -1,20 +1,21 @@
 #include <boost/graph/successive_shortest_path_nonnegative_weights.hpp>
 #include <stdexcept>
+#include <boost/log/trivial.hpp>
 
 #include "assignment.h"
 #include "planner_starter_code.hpp"
 
-#define DEBUG
-
-#ifdef DEBUG
-#include <cstdio>
-#endif
 
 #define EXCEPTION_MSG_MAX_SIZE 1024
 #define MAX_AUGMENTED_ENTITIES 10
 #define MAX_EDGE_COST 100000
 
 using namespace std;
+
+// logger setup
+using namespace boost::log::trivial;
+extern boost::log::sources::severity_logger<severity_level> lg;
+
 
 Assignment::Assignment() {
    m_src_vx = boost::add_vertex(m_graph);
@@ -62,7 +63,7 @@ void Assignment::reset_graph() {
 }
 
 void Assignment::set_cost(const Robot &robot, const Point &goal,
-                          uint32_t cost) {
+                          std::size_t cost) {
    auto robot_iter = m_robots.left.find(robot);
    vertex_t robot_vx;
    if (robot_iter == m_robots.left.end()) {
@@ -86,7 +87,7 @@ void Assignment::set_cost(const Robot &robot, const Point &goal,
    upsert_edge(robot_vx, goal_vx, cost);
 }
 
-void Assignment::upsert_edge(vertex_t src_vx, vertex_t sink_vx, int32_t cost) {
+void Assignment::upsert_edge(vertex_t src_vx, vertex_t sink_vx, int cost) {
    auto edge = boost::edge(src_vx, sink_vx, m_graph);
    if (edge.second) {
       m_graph[edge.first].m_cost = cost;
@@ -107,9 +108,9 @@ void Assignment::upsert_edge(vertex_t src_vx, vertex_t sink_vx, int32_t cost) {
    }
 }
 
-uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
+std::size_t Assignment::run_solver(std::map<Robot, Point> &solution,
                                 std::list<Point> &unallocated_goals) {
-   uint32_t cost = 0;
+   std::size_t cost = 0;
    solution.clear();
 
    // manage any problem imbalance
@@ -151,9 +152,7 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
       }
    }
 
-#ifdef DEBUG
-   printf("%zu robots, %zu goals\n", m_robots.size(), m_goals.size());
-#endif
+   BOOST_LOG_SEV(lg, debug) << m_robots.size() << " robots, " <<  m_goals.size() << " goals" << endl;
    assert(m_robots.size() ==
           m_goals.size()); // the problem should now be balanced
    boost::successive_shortest_path_nonnegative_weights(
@@ -174,7 +173,7 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
          if (!m_graph[*task_edge_it].m_is_reverse) {
             vertex_t goal_vx = target(*task_edge_it, m_graph);
             if (m_graph[*task_edge_it].m_residual_capacity == 0) {
-               int32_t edge_cost =
+               int edge_cost =
                    m_graph[edge(robot_vx, goal_vx, m_graph).first].m_cost;
                assert(edge_cost > 0);
                const Point &cur_pt = m_goals.right.at(goal_vx);
@@ -186,13 +185,16 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
                   continue;
                }
                solution[m_robots.right.at(robot_vx)] = cur_pt;
-               cost += uint32_t(edge_cost);
-#ifdef DEBUG
-               printf("R %d [%zu] -> Pt (%d, %d) [%zu]: %d [%u]\n",
-                      m_robots.right.at(robot_vx).get_id(), robot_vx, 
-                      cur_pt.x, cur_pt.y, goal_vx, 
-                      edge_cost, cost);
-#endif
+               cost += std::size_t(edge_cost);
+
+               // a debug print
+               char printout[EXCEPTION_MSG_MAX_SIZE];
+               snprintf(printout, EXCEPTION_MSG_MAX_SIZE, "R %d [%zu] -> Pt (%d, %d) [%zu]: %d [%zu]\n",
+                        m_robots.right.at(robot_vx).get_id(), robot_vx, 
+                        cur_pt.x, cur_pt.y, goal_vx, 
+                        edge_cost, cost);
+               BOOST_LOG_SEV(lg, debug) << printout << endl;
+
                break;
             }
          }

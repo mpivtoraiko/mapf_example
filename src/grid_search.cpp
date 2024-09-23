@@ -1,5 +1,3 @@
-#include <ostream>
-
 #include "grid_search.h"
 
 std::size_t GridSearch::solve(std::vector<Point> &solution) {
@@ -20,7 +18,7 @@ std::size_t GridSearch::solve(std::vector<Point> &solution) {
    GoalVisitor goal_visitor(m_goal_vx);
 
    try {
-      astar_search(m_barrier_grid, m_start_vx, heuristic,
+      astar_search(m_obstacle_grid, m_start_vx, heuristic,
                    boost::weight_map(edge_cost)
                        .predecessor_map(pred_property_map)
                        .distance_map(cost_property_map)

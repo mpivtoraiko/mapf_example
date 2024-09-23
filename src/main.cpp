@@ -1,5 +1,9 @@
-#include "planner_starter_code.hpp"
 #include <cassert>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/console.hpp>
+
+#include "planner_starter_code.hpp"
+
 
 /*
 
@@ -15,7 +19,18 @@
         ./run
 */
 
+void init_logger() {
+   namespace logging = boost::log;
+   logging::add_console_log(std::cout, logging::keywords::format =
+                                           "%Message%");
+   logging::core::get()->set_filter(logging::trivial::severity >=
+                                    logging::trivial::info);
+}
+
+
 int main() {
+   init_logger();
+
    auto grid = std::make_shared<Grid>(10, 10);
 
    // for initial testing, create obstacles, dig locations and drop off
@@ -49,14 +64,14 @@ int main() {
    // this loop simulates time advancing and after some time (80 ticks here) we
    //  submit a new job in the form of a new dig location
    int tick = 0;
-   int N = 30;
+   int N = 100;
    while (tick < N) {
       // at every tick the planner monitors if there is new work
       planner.monitor();
       printState(grid, {robot1, robot2});
 
       // insert a new dig location after some time.
-      if (tick == 8) {
+      if (tick == 80) {
          Point newDigLocations = {8, 9};
          grid->setDigLocation(newDigLocations);
       }
