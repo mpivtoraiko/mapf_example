@@ -4,6 +4,8 @@
 #include "assignment.h"
 #include "planner_starter_code.hpp"
 
+#define DEBUG
+
 #ifdef DEBUG
 #include <cstdio>
 #endif
@@ -187,8 +189,9 @@ uint32_t Assignment::run_solver(std::map<Robot, Point> &solution,
                cost += uint32_t(edge_cost);
 #ifdef DEBUG
                printf("R %d [%zu] -> Pt (%d, %d) [%zu]: %d [%u]\n",
-                      m_robots.right.at(robot_vx).get_id(), robot_vx, cur_pt.x,
-                      cur_pt.y, goal_vx, edge_cost, cost);
+                      m_robots.right.at(robot_vx).get_id(), robot_vx, 
+                      cur_pt.x, cur_pt.y, goal_vx, 
+                      edge_cost, cost);
 #endif
                break;
             }

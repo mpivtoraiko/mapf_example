@@ -49,14 +49,14 @@ int main() {
    // this loop simulates time advancing and after some time (80 ticks here) we
    //  submit a new job in the form of a new dig location
    int tick = 0;
-   int N = 100;
+   int N = 30;
    while (tick < N) {
       // at every tick the planner monitors if there is new work
       planner.monitor();
       printState(grid, {robot1, robot2});
 
       // insert a new dig location after some time.
-      if (tick == 80) {
+      if (tick == 8) {
          Point newDigLocations = {8, 9};
          grid->setDigLocation(newDigLocations);
       }

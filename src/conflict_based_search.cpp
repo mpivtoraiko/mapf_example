@@ -14,6 +14,7 @@ using namespace std;
 
 
 
+
 std::ostream & operator<<(std::ostream& os, TrajectoryConflictMap const& conflict_map)
 {
    for (const auto & [bot_idx, conflicts] : conflict_map) {
@@ -55,6 +56,17 @@ std::ostream & operator<<(std::ostream& os, const Trajectory & trajectory)
    return os;
 }
 
+
+void conflict_map_append(size_t bot_idx, const RobotState & robot_state, TrajectoryConflictMap &conflict_map)
+{
+   const auto &bot_key = conflict_map.find(bot_idx);
+   if (bot_key == conflict_map.end()) {
+      conflict_map.insert({bot_idx, Trajectory({robot_state})});
+   }
+   else {
+      bot_key->second.push_back(robot_state);
+   }
+}
 
 /*     ----------------     CBSTreeNode     ----------------     */
 

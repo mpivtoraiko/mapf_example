@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include "assignment.h"
+#include "conflict_based_search.h"
 #include "planner_starter_code.hpp"
 
 #define EXCEPTION_MSG_MAX_SIZE 1024
@@ -123,14 +124,13 @@ Point Grid::find_best_dropoff_path(const Point &start_pt,
    std::size_t min_dist = 100000;
    Point best_dropoff;
    path.clear();
-   for (auto cur_dropoff = dropOffLocations.begin();
-        cur_dropoff != dropOffLocations.end(); ++cur_dropoff) {
+   for (const auto & [dropoff_pt, dropoff_count] : dropOffLocations) {
       vector<Point> cur_path;
-      std::size_t cur_dist = get_path(start_pt, cur_dropoff->first, cur_path);
+      std::size_t cur_dist = get_path(start_pt, dropoff_pt, cur_path);
       if (cur_dist < min_dist) {
          min_dist = cur_dist;
          path = cur_path;
-         best_dropoff = cur_dropoff->first;
+         best_dropoff = dropoff_pt;
       }
    }
    return best_dropoff;
@@ -162,7 +162,7 @@ void Robot::advancePlan() {
       digGoal = false;
       // position member should still be accurate after the previous call to
       // this f-n
-      return;
+      return;  // stopping bot, it remains at the current position
    }
    position = currentPlan[currentPlanStep];
    return;
@@ -188,7 +188,7 @@ void Robot::clearPlan() {
 bool Robot::isInActivePath(const Point &check_pt) {
    if (currentPlan.size() == 0)
       return false;
-   for (auto cur_pt : currentPlan) {
+   for (const auto & cur_pt : currentPlan) {
       if (cur_pt == check_pt)
          return true;
    }
@@ -247,7 +247,7 @@ void Planner::monitor() {
 
 int Planner::estimateDistanceHeuristic(const Point &start_pt,
                                        const Point &end_pt) {
-   std::vector<Point> path;
+   Path path;
    return int(grid->get_path(start_pt, end_pt, path));
 }
 
@@ -263,34 +263,53 @@ void Planner::replan() {
          available_robots.push_back(cur_bot);
    }
 
+   cout << available_robots.size() << " robots, " << grid->getDigLocations().size() << " dig locations" << endl;
+
+   // setup the assignment solver
    Assignment assignment;
    for (auto cur_bot : available_robots) {
-      for (auto cur_pt : grid->getDigLocations()) {
+      for (const auto & cur_pt : grid->getDigLocations()) {
          uint32_t cost =
              estimateDistanceHeuristic(cur_bot->getCurrentPosition(), cur_pt);
          assignment.set_cost(*cur_bot, cur_pt, cost);
       }
    }
+
+   // run the assignment solver
    std::map<Robot, Point> solution;
    std::list<Point> unallocated_goals;
+   cout << "available robots: " << available_robots.size() << endl;
    assignment.run_solver(solution, unallocated_goals);
-   for (map<Robot, Point>::iterator sol_iter = solution.begin();
-        sol_iter != solution.end(); ++sol_iter) {
+
+   // setup start and goal point arrays to plug into CBS
+   vector<Point> start_points;
+   vector<Point> goal_points;   
+   for (const auto & [solution_robot, solution_goal] : solution) {
+      start_points.push_back(solution_robot.getCurrentPosition());
+      goal_points.push_back(solution_goal);
+   }
+   PathSet solution_paths;
+   ConflictBasedSearch cbs_planner(this->grid, solution.size());
+   cbs_planner.search(start_points, goal_points, solution_paths);
+
+   // set the computed paths for execution:
+   // we reiterate through the assignment solution std::map in order
+   // to make sure to preserve robot ID - to - vector index mapping
+   // that we used to setup the start_points vector 
+   // (reconsider ConflictBasedSearch API to simplify this)
+   size_t path_idx = 0;
+   for (const auto & [solution_robot, solution_goal] : solution) {
       // TODO: the inner loop below is needed since sol_iter->first is returned
       // as a const. Would need to move away from the std::map container.
       for (auto cur_bot : robots) {
-         if (cur_bot->get_id() == sol_iter->first.get_id()) {
-            cur_bot->setGoal(sol_iter->second);
-            std::vector<Point> path;
-            grid->get_path(cur_bot->getCurrentPosition(), sol_iter->second,
-                           path);
-            cur_bot->executePlan(path, true);
+         if (cur_bot->get_id() == solution_robot.get_id()) {
+            cur_bot->setGoal(solution_goal);
+            cur_bot->executePlan(solution_paths[path_idx], true);
             break;
          }
       }
+      ++path_idx;
    }
-
-   // TODO: run CBS and set plans to all bots
 }
 
 void printState(const std::shared_ptr<Grid> &grid,

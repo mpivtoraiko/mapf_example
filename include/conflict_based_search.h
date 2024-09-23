@@ -50,17 +50,7 @@ typedef std::unordered_map<std::size_t, Trajectory> TrajectoryConflictMap;
 //std::ostream & operator<<(std::ostream& os, TrajectoryConflict const& conflict);
 std::ostream & operator<<(std::ostream& os, TrajectoryConflictMap const& conflict_set);
 
-void conflict_map_append(size_t bot_idx, const RobotState & robot_state, TrajectoryConflictMap &conflict_map)
-{
-   const auto &bot_key = conflict_map.find(bot_idx);
-   if (bot_key == conflict_map.end()) {
-   //if (conflict_map.contains(bot_idx)) {
-      conflict_map.insert({bot_idx, Trajectory({robot_state})});
-   }
-   else {
-      bot_key->second.push_back(robot_state);
-   }
-}
+void conflict_map_append(size_t bot_idx, const RobotState & robot_state, TrajectoryConflictMap &conflict_map);
 
 
 std::ostream & operator<<(std::ostream& os, const Path & path);
