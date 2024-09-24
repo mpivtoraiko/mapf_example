@@ -26,6 +26,10 @@ add_executable(run src/main.cpp)
 target_include_directories(run PRIVATE ./include)
 target_link_libraries(run planner)
  
+add_executable(test_astar test/test_astar.cpp)
+target_include_directories(test_astar PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(test_astar ${Boost_LIBRARIES})
+
 # Tests
 
 add_executable(test_starter_code test/test_starter_code.cpp)
@@ -44,3 +48,6 @@ add_executable(test_conflict_based_search test/test_conflict_based_search.cpp)
 target_include_directories(test_conflict_based_search PRIVATE ./include)
 target_link_libraries(test_conflict_based_search planner ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
 
+add_executable(test_conflict_based_search_orig test/test_conflict_based_search_orig.cpp)
+target_include_directories(test_conflict_based_search_orig PRIVATE ./include)
+target_link_libraries(test_conflict_based_search_orig planner)

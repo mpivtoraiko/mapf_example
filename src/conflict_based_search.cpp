@@ -47,10 +47,13 @@ std::ostream &operator<<(std::ostream &os, const Trajectory &trajectory) {
    return os;
 }
 
+
+
 /*     ----------------     TrajectoryConflictMap     ----------------     */
 
 std::ostream &operator<<(std::ostream &os,
                          TrajectoryConflictMap const &conflict_map) {
+   os << "conflicts:" << endl;
    for (const auto &[bot_idx, conflicts] : conflict_map) {
       os << "  " << bot_idx << ": " << conflicts << endl;
    }
@@ -205,6 +208,9 @@ ConflictBasedSearch::search(const std::vector<Point> &start_positions,
    }
 
    BOOST_LOG_SEV(lg, trace) << new_conflicts;
+   // the vertices we already explored, to prevent seacrh loops:
+   std::unordered_set<TrajectoryConflictMap> closed_list;
+   closed_list.insert(new_conflicts);
    search_queue.push(CBSTreeNode(new_conflicts, node_cost));
 
    size_t num_iterations = 0;
@@ -212,8 +218,7 @@ ConflictBasedSearch::search(const std::vector<Point> &start_positions,
       const CBSTreeNode &node = search_queue.top();
       ++num_iterations;
 
-      BOOST_LOG_SEV(lg, debug) << "***" << endl
-                               << "#" << num_iterations << endl
+      BOOST_LOG_SEV(lg, debug) << "*** #" << num_iterations << endl
                                << node << endl;
 
       // for all the conflict combinations found, enqueue them as children
@@ -222,17 +227,15 @@ ConflictBasedSearch::search(const std::vector<Point> &start_positions,
 
       // generate successors
       for (const auto &cur_combination : conflict_combinations) {
-         BOOST_LOG_SEV(lg, debug) << "New succ: " << cur_combination << endl;
+         BOOST_LOG_SEV(lg, trace) << endl << "New succ: " << cur_combination;
 
          node_cost = this->grid_search(start_positions, goal_positions,
                                        cur_combination, paths);
          if (node_cost == 0) {
             // we're unable to find this plan, so skip this successor
-            BOOST_LOG_SEV(lg, debug) << "No path" << endl;
+            BOOST_LOG_SEV(lg, trace) << "No path" << endl;
             continue;
          }
-         BOOST_LOG_SEV(lg, trace) << "cost " << node_cost << ", paths:" << endl
-                                  << paths << endl;
 
          if (this->check_conflicts(paths, new_conflicts) == 0) {
             BOOST_LOG_SEV(lg, debug) << "No conflicts!" << endl;
@@ -241,13 +244,20 @@ ConflictBasedSearch::search(const std::vector<Point> &start_positions,
             output_paths = paths; // prepare the return value
             return num_iterations;
          }
+         BOOST_LOG_SEV(lg, trace) << "paths:" << endl << paths << new_conflicts; 
 
-         BOOST_LOG_SEV(lg, trace) << new_conflicts;
-         search_queue.push(CBSTreeNode(cur_combination, node_cost));
+         // before we enqueue these conflicts, let's see if the identical ones
+         // haven't already been queued up for exploration
+         if (closed_list.count(new_conflicts) > 0) {
+            BOOST_LOG_SEV(lg, trace) << ".. closed, skipping" << endl;
+            continue; // skip this conflict set, we're already exploring them
+         }
+         closed_list.insert(new_conflicts);
+         search_queue.push(CBSTreeNode(new_conflicts, node_cost));
          BOOST_LOG_SEV(lg, trace)
-             << "queue size " << search_queue.size() << endl;
-      }
-   }
+             << "queue size " << search_queue.size() << endl << endl;
+      }    // for (const auto &cur_combination : conflict_combinations)
+   }   // for (; search_queue.empty() == false; search_queue.pop())
 
    BOOST_LOG_SEV(lg, error)
        << "No solution found after " << num_iterations << " iterations" << endl;
