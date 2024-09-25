@@ -1,109 +1,204 @@
 #pragma once
 
+
+#include <iostream>
+#include <list>
+#include <map>
+#include <set>
+#include <utility>
+
 #include <boost/graph/astar_search.hpp>
 #include <boost/graph/filtered_graph.hpp>
-#include <boost/graph/grid_graph.hpp>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/operators.hpp>
+#include <boost/ref.hpp>
 
-#include <boost/random/uniform_int.hpp>
-#include <boost/unordered_map.hpp>
-#include <boost/unordered_set.hpp>
 
-#include "point.h"
+namespace MotionStep
+{
+enum direction
+{
+    MIN = 0,
+    UP = MIN, DOWN, LEFT, RIGHT, PAUSE, NONE
+};
+}
 
-#define POINT_TO_VX_DESCRIPTOR(pt)                                             \
-   {                                                                           \
-      { (long unsigned int)pt.x, ((long unsigned int)pt.y) }                   \
-   }
 
-/**
- * Inner graph type and its vertex types
- */
-typedef boost::grid_graph<2> SearchGrid;
-typedef boost::graph_traits<SearchGrid>::vertex_descriptor VertexDescriptor;
-typedef boost::graph_traits<SearchGrid>::vertices_size_type VertexSizeType;
+// TODO: consider merging with RobotState (fconflict_based_search.h) via multiple inheritance
+struct Cell : public boost::additive<Cell, boost::totally_ordered<Cell, boost::equivalent<Cell>>>
+{
+   Cell(std::size_t x = 0, std::size_t y = 0);
+   Cell(const Cell & other);
 
-struct VertexHash : std::unary_function<VertexDescriptor, std::size_t> {
-   std::size_t operator()(VertexDescriptor const &in_vx) const {
-      std::size_t seed = 0;
-      boost::hash_combine(seed, in_vx[0]);
-      boost::hash_combine(seed, in_vx[1]);
-      return seed;
-   }
+   Cell & operator=(Cell const& other);
+   Cell & operator+=(Cell const& other);
+
+   bool operator<(Cell const& other) const;
+
+   std::size_t m_x;
+   std::size_t m_y;
+   std::size_t m_time;
+
+   Cell get_neighbor(MotionStep::direction direction) const;
+   std::set<Cell> get_all_neighbors() const;
 };
 
-typedef boost::unordered_set<VertexDescriptor, VertexHash> VertexSet;
-typedef boost::vertex_subset_complement_filter<SearchGrid, VertexSet>::type
-    FilteredSearchGrid;
 
-/**
- * Outer interface class
- */
-class GridSearch {
+std::ostream & operator<<(std::ostream & os, Cell const& cell);
+
+struct NeighborIterator;
+
+struct GridGraph
+{
+   GridGraph();
+
+   typedef Cell                              vertex_descriptor;
+   typedef std::pair<Cell, Cell>             edge_descriptor;
+   typedef boost::undirected_tag             directed_category;
+   typedef boost::disallow_parallel_edge_tag edge_parallel_category;
+   typedef boost::incidence_graph_tag        traversal_category;
+
+   typedef NeighborIterator                 out_edge_iterator;
+   typedef int                               degree_size_type;
+};
+
+namespace boost
+{
+   template <> struct graph_traits<GridGraph>
+   {
+      typedef GridGraph::vertex_descriptor      vertex_descriptor;
+      typedef GridGraph::edge_descriptor        edge_descriptor;
+      typedef GridGraph::out_edge_iterator      out_edge_iterator;
+
+      typedef GridGraph::directed_category      directed_category;
+      typedef GridGraph::edge_parallel_category edge_parallel_category;
+      typedef GridGraph::traversal_category     traversal_category;
+
+      typedef GridGraph::degree_size_type       degree_size_type;
+
+      typedef void in_edge_iterator;
+      typedef void vertex_iterator;
+      typedef void vertices_size_type;
+      typedef void edge_iterator;
+      typedef void edges_size_type;
+   };
+}
+
+std::pair<GridGraph::out_edge_iterator, 
+          GridGraph::out_edge_iterator> out_edges(GridGraph::vertex_descriptor, GridGraph const&);
+GridGraph::degree_size_type out_degree(GridGraph::vertex_descriptor, GridGraph const&);
+GridGraph::vertex_descriptor source(GridGraph::edge_descriptor, GridGraph const&);
+GridGraph::vertex_descriptor target(GridGraph::edge_descriptor, GridGraph const&);
+
+
+struct NeighborIterator : public boost::iterator_facade<NeighborIterator,
+                                                        std::pair<Cell, Cell>,
+                                                        boost::forward_traversal_tag,
+                                                        std::pair<Cell, Cell> >
+{
  public:
-   GridSearch(std::size_t x_dim, std::size_t y_dim)
-       : m_grid(boost::array<std::size_t, 2>({{x_dim, y_dim}})),
-         m_obstacle_grid(
-             boost::make_vertex_subset_complement_filter(m_grid, m_obstacles)) {
-   }
+   NeighborIterator();
+   NeighborIterator(Cell cur_cell, MotionStep::direction direction);
 
-   void set_start(const Point &start_pt) {
-      m_start_vx = POINT_TO_VX_DESCRIPTOR(start_pt);
-   }
-   void set_goal(const Point &goal_pt) {
-      m_goal_vx = POINT_TO_VX_DESCRIPTOR(goal_pt);
-   }
+   NeighborIterator & operator=(NeighborIterator const& other);
+   std::pair<Cell, Cell> operator*() const;
+   //NeighborIterator& operator++();
+   NeighborIterator& increment(); // {return operator++();}  // needed by iterator_facade.hpp
 
-   void set_obstacle(const Point &obstacle_pt) {
-      m_obstacles.insert(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
-   }
-
-   void unset_obstacle(const Point &obstacle_pt) {
-      m_obstacles.erase(POINT_TO_VX_DESCRIPTOR(obstacle_pt));
-   }
-
-   std::size_t solve(std::vector<Point> &solution);
+   bool operator==(NeighborIterator const& other) const;
+   bool equal(NeighborIterator const &other) const { return operator==(other); }  // needed by iterator_facade.hpp
 
  private:
-   VertexDescriptor m_start_vx;
-   VertexDescriptor m_goal_vx;
-
-   SearchGrid m_grid;
-   FilteredSearchGrid m_obstacle_grid;
-   VertexSet m_obstacles;
-   std::size_t m_solution_length;
+   Cell m_cell;
+   MotionStep::direction m_direction;
 };
 
+
 /**
- * A-star heuristic on a grid: L1-distance
+ * A traversal filter
  */
-class GridHeuristic
-    : public boost::astar_heuristic<FilteredSearchGrid, std::size_t> {
+// struct orthogonal_only
+// {
+//     typedef std::pair<Cell, Cell> Edge;
+//     bool operator()(Edge const& edge) const
+//     {
+//         return edge.first.m_x == edge.second.m_x || edge.first.m_y == edge.second.m_y;
+//     }
+// };
+
+template <typename Graph> class DistanceHeuristic;
+
+struct FoundGoal {}; // exception for termination
+
+
+class astar_goal_visitor : public boost::default_astar_visitor
+{
  public:
-   GridHeuristic(VertexDescriptor goal_vx) : m_goal(goal_vx) {};
+   astar_goal_visitor(const Cell & goal) : m_goal(goal) {}
 
-   std::size_t operator()(VertexDescriptor query_vx) {
-      return std::abs(int(m_goal[0] - query_vx[0])) +
-             std::abs(int(m_goal[1] - query_vx[1]));
-   }
-
- private:
-   VertexDescriptor m_goal;
-};
-
-/**
- * Termination condition: goal achievement and the type to
- * throw as exception to interrupt the search
- */
-struct FoundGoal {};
-
-struct GoalVisitor : public boost::default_astar_visitor {
-   GoalVisitor(VertexDescriptor goal) : m_goal_vx(goal) {};
-
-   void examine_vertex(VertexDescriptor query_vx, const FilteredSearchGrid &) {
-      if (query_vx == m_goal_vx)
+   void examine_vertex(const Cell & cell, GridGraph const& g) {
+      (void) g;   // squash unused-parameter warning
+      std::cout << "Exploring " << cell << "..." << std::endl;
+      if(cell == m_goal)
          throw FoundGoal();
    }
 
  private:
-   VertexDescriptor m_goal_vx;
+   Cell m_goal;
 };
+
+
+
+template <typename Key, typename Value> class DefaultMap
+{
+public:
+   typedef Key key_type;
+   typedef Value data_type;
+   typedef std::pair<Key, Value> value_type;
+
+   DefaultMap(Value const& default_value) : m_map(), m_default_value(default_value) {}
+
+   Value & operator[](Key const& key) {
+      if (m_map.find(key) == m_map.end()) {
+         m_map[key] = m_default_value;
+      }
+      return m_map[key];
+   }
+
+private:
+    std::map<Key, Value> m_map;
+    Value const m_default_value;
+};
+
+
+
+struct PredecessorMap
+{
+   PredecessorMap() : m_map() {}
+   PredecessorMap(PredecessorMap const& other) : m_map(other.m_map) {}
+
+   typedef Cell key_type;
+   typedef Cell value_type;
+   typedef Cell & reference_type;
+   typedef boost::read_write_property_map_tag category;
+
+   Cell & operator[](const Cell & cell) { return m_map[cell]; }
+
+   std::map<Cell, Cell> m_map;
+};
+
+
+template <typename Graph> class DistanceHeuristic : public boost::astar_heuristic<Graph, std::size_t>
+{
+public:
+   DistanceHeuristic(Cell goal) : m_goal(goal) {}
+   unsigned operator()(Cell cell)
+   {
+      int dx = std::abs(int(m_goal.m_x) - int(cell.m_x));
+      int dy = std::abs(int(m_goal.m_y) - int(cell.m_y));
+      return static_cast<std::size_t>(dx + dy);
+   }
+private:
+    Cell m_goal;
+};
+

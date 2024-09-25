@@ -64,7 +64,7 @@ template <> struct std::hash<Trajectory> {
 /**
  * A representation of trajectory conflicts
  */
-typedef std::unordered_map<std::size_t, Trajectory> TrajectoryConflictMap;
+typedef std::map<std::size_t, Trajectory> TrajectoryConflictMap;
 
 std::ostream &operator<<(std::ostream &os,
                          TrajectoryConflictMap const &conflict_set);
