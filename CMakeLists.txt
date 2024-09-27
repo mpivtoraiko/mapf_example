@@ -22,18 +22,17 @@ add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 # target_include_directories(planner PUBLIC ./include ${Boost_INCLUDE_DIRS})
 # target_link_libraries(planner ${Boost_LIBRARIES})
 
-add_library(planner SHARED src/grid_search.cpp)
+add_library(planner SHARED src/robot_state.cpp src/grid_search.cpp)
 target_include_directories(planner PUBLIC ./include ${Boost_INCLUDE_DIRS})
 target_link_libraries(planner ${Boost_LIBRARIES})
-
 
 # add_executable(run src/main.cpp)
 # target_include_directories(run PRIVATE ./include)
 # target_link_libraries(run planner)
  
-# add_executable(test_astar test/test_astar.cpp src/grid_search.)
-# target_include_directories(test_astar PRIVATE ${Boost_INCLUDE_DIRS})
-# target_link_libraries(test_astar ${Boost_LIBRARIES})
+add_executable(test_astar src/robot_state.cpp src/grid_search.cpp)
+target_include_directories(test_astar PRIVATE ./include ${Boost_INCLUDE_DIRS})
+target_link_libraries(test_astar ${Boost_LIBRARIES})
 
 # Tests
 
